@@ -43,6 +43,7 @@ def generate_player(position: Position, min_age: int = 21, max_age: int = 32,
         position=position,
         age=age,
         overall=overall,
+        base_overall=overall,
         market_price=market_price,
     )
 
@@ -57,10 +58,3 @@ def generate_starting_roster() -> list[Player]:
 def generate_market_player() -> Player:
     position = random.choice(list(Position))
     return generate_player(position, min_age=20, max_age=36, min_ovr=45, max_ovr=90, for_market=True)
-
-
-def generate_rookie_player() -> Player:
-    """Draft-class filler: young, unproven, but with the highest room to grow
-    (see age_xp_multiplier) -- replaces a retiree at each season's end."""
-    position = random.choice(list(Position))
-    return generate_player(position, min_age=20, max_age=22, min_ovr=45, max_ovr=65, for_market=True)

@@ -9,10 +9,8 @@ from app.core.game_data import (
     NFL_TEAM_CONFERENCE_BY_CODE,
     PLAYOFF_APPEARANCE_BONUS,
     REGULAR_SEASON_DAYS,
-    RETIREMENT_AGE,
     SUPER_BOWL_WINNER_BONUS,
 )
-from app.core.player_generator import generate_rookie_player
 from app.core.schedule import LEAGUE_TZ
 from app.models.enums import SeasonPhase
 from app.models.league import League
@@ -174,23 +172,18 @@ def advance_playoffs(db: Session, league: League, now: datetime) -> dict | None:
     return None
 
 
-def apply_aging_and_draft(db: Session) -> dict:
+def reset_player_ratings(db: Session) -> dict:
+    """Every player stays in the league permanently (no retirement) -- each
+    new season just wipes out the previous season's training gains, so
+    everyone starts back at their original imported rating."""
     all_players = db.query(Player).all()
-    retired = []
     for player in all_players:
         player.age += 1
-        threshold = RETIREMENT_AGE.get(player.position.value, RETIREMENT_AGE["default"])
-        if player.age >= threshold:
-            retired.append(player)
-
-    for player in retired:
-        db.delete(player)
-
-    for _ in retired:
-        db.add(generate_rookie_player())
+        player.overall = player.base_overall
+        player.xp = 0
 
     db.flush()
-    return {"aged": len(all_players), "retired": len(retired), "rookies_drafted": len(retired)}
+    return {"aged": len(all_players), "ratings_reset": len(all_players)}
 
 
 def _record_season_history(db: Session, league: League, champion_id: int) -> None:
@@ -232,7 +225,7 @@ def _record_season_history(db: Session, league: League, champion_id: int) -> Non
 def end_season(db: Session, league: League, now: datetime, champion_id: int) -> dict:
     _record_season_history(db, league, champion_id)
 
-    aging_result = apply_aging_and_draft(db)
+    aging_result = reset_player_ratings(db)
 
     for team in db.query(Team).all():
         team.wins = 0

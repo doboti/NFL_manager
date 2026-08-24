@@ -119,6 +119,7 @@ def import_players(db: Session) -> dict:
                         position=position,
                         age=age,
                         overall=overall,
+                        base_overall=overall,
                         market_price=max(1, round(player_market_value(BASE_MARKET_PRICE, overall, age))),
                         espn_id=espn_id,
                         photo_url=headshot,

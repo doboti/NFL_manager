@@ -20,6 +20,7 @@ class Player(Base):
 
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     overall: Mapped[int] = mapped_column(Integer, nullable=False)
+    base_overall: Mapped[int] = mapped_column(Integer, nullable=False)
     xp: Mapped[int] = mapped_column(Integer, default=0)
 
     market_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
