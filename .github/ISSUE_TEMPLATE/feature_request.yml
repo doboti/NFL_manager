@@ -1,0 +1,28 @@
+name: Feature ötlet
+description: Új funkció vagy fejlesztés javaslata
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Mit szeretnél?
+      description: Írd le a funkciót/fejlesztést, amit elképzeltél.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Miért kellene ez?
+      description: Milyen problémát old meg, vagy mit javítana a játékon?
+    validations:
+      required: false
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Van elképzelésed, hogyan nézzen ki / működjön?
+      description: Nem kötelező -- ha nincs konkrét elképzelésed, hagyd üresen, kitaláljuk együtt.
+    validations:
+      required: false

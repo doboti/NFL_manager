@@ -1,0 +1,50 @@
+name: Hibajegy
+description: Valami nem úgy működik, ahogy kellene
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Mi történt?
+      description: Írd le, mit láttál.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reprodukálás lépései
+      description: Miket kattintottál/csináltál, hogy előjöjjön a hiba?
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Mit vártál volna helyette?
+    validations:
+      required: false
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Hol jelentkezett?
+      options:
+        - Production (100.78.45.17)
+        - Helyi dev környezet
+        - Mindkettő
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Képernyőkép / log / egyéb
+      description: Húzz ide képet, vagy illessz be log-részletet.
+    validations:
+      required: false
