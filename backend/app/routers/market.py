@@ -21,9 +21,14 @@ def list_market(
     search: str | None = Query(None, max_length=50),
     limit: int = Query(30, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    query = db.query(Player).filter(Player.team_id.is_(None))
+    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    if team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
+
+    query = db.query(Player).filter(Player.league_id == team.league_id, Player.team_id.is_(None))
 
     if position is not None:
         query = query.filter(Player.position == position)

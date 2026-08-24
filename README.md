@@ -56,12 +56,16 @@ docker-compose.yml
 
 ### 1. Regisztráció és csapatválasztás
 
-A regisztráció (`POST /auth/register`) csak e-mailt, jelszót és menedzsernevet kér — **nincs csapatválasztás ekkor**. Bejelentkezés után, ha a felhasználónak még nincs csapata, a `/select-team` oldalra kerül: liga választás (jelenleg csak NFL), majd a 32 valódi NFL-csapat egyike (`POST /teams/claim`).
+A regisztráció (`POST /auth/register`) csak e-mailt, jelszót és menedzsernevet kér — **nincs csapatválasztás ekkor**. Bejelentkezés után, ha a felhasználónak még nincs csapata, a `/select-team` oldalra kerül: liga választás (`GET /league/available`), majd az adott liga egyik csapata (`POST /teams/claim`, `league_key` + `nfl_team_code`).
+
+Két liga érhető el, teljesen független csapatokkal, ligatáblákkal, szezonokkal és szabadügynök-poollal (`app/core/game_data.py: LEAGUES`):
+- **NFL** (`nfl`) — a valódi 32 csapat, 8 divízió.
+- **College Football** (`college`) — egy kézzel válogatott, valós ESPN-rosterrel rendelkező 32 csapatos kör (a CFL és egy európai liga rosteradatai nem elérhetők az ESPN API-n, ezért csak az NCAA valósult meg második ligaként), ugyanolyan 8 divíziós/playoff-szerkezettel, `CF-` előtagú csapatkódokkal.
 
 - Ha a csapatot még senki (ember) nem választotta, de **AI bot vezeti**, a "kiválasztás" átveszi tőle a már működő, teljes rosterrel és eddigi állással rendelkező franchise-t (a bot-fiók törlődik).
 - Ha egy másik ember már lefoglalta, a választás elutasítva.
-
-A csapat **teljes, aktuálisan szabad valódi rosterét** kapja meg (kb. 70-90 játékos, az importált ESPN-adatokból).
+- A csapat kezdéskor **csak a 3 legjobb overallú játékost kapja meg pozíciónként** (nem a teljes ~70-90 fős valódi rostert) — a többi a szabadügynök-piacon marad, onnan igazolható. Ez érvényes akkor is, ha egy már bot-irányított, feltöltött csapatot vesz át valaki.
+- Bármikor lecserélhető a csapat (`POST /teams/release`): a jelenlegi csapatot azonnal átveszi egy AI, a felhasználó pedig újra a `/select-team`-re kerül, bármelyik ligában választhat újat. A korábbi csapat szezon-történeti eredményei megmaradnak, a tulajdonostól függetlenül.
 
 ### 2. Liga: divíziók, állás, sorsolás
 
@@ -165,8 +169,11 @@ Mindegyik a backend konténeren belül futtatandó:
 # Feltölti/frissíti az adatbázist az összes NFL csapat aktuális rosterével (~2300+ játékos)
 docker compose exec backend python -m app.scripts.import_nfl_players
 
-# Minden gazdátlan NFL-csapatot AI-bottal tölt fel (indításkor automatikusan lefut,
-# ez a manuális újra-seedeléshez kell, pl. reset után ha a backend nem indult újra)
+# Ugyanez a college football liga 32 kiválasztott csapatához (~2500+ játékos)
+docker compose exec backend python -m app.scripts.import_college_players
+
+# Minden gazdátlan csapatot (mindkét ligában) AI-bottal tölt fel (indításkor automatikusan
+# lefut, ez a manuális újra-seedeléshez kell, pl. reset után ha a backend nem indult újra)
 docker compose exec backend python -m app.scripts.seed_bot_teams
 
 # Töröl minden felhasználót, csapatot és a hozzájuk tartozó adatot (edzés, szponzor,

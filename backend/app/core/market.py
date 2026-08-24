@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.core.player_generator import generate_market_player
+from app.models.league import League
 from app.models.player import Player
 from app.models.team import Team
 
@@ -12,12 +13,14 @@ class MarketError(Exception):
     pass
 
 
-def refill_market(db: Session) -> int:
-    current_count = db.query(Player).filter(Player.team_id.is_(None)).count()
+def refill_market(db: Session, league: League) -> int:
+    current_count = db.query(Player).filter(Player.league_id == league.id, Player.team_id.is_(None)).count()
     missing = max(0, MARKET_POOL_SIZE - current_count)
 
     for _ in range(missing):
-        db.add(generate_market_player())
+        player = generate_market_player()
+        player.league_id = league.id
+        db.add(player)
 
     if missing:
         db.commit()
@@ -26,7 +29,11 @@ def refill_market(db: Session) -> int:
 
 
 def buy_player(db: Session, team: Team, player_id: int) -> Player:
-    player = db.query(Player).filter(Player.id == player_id, Player.team_id.is_(None)).first()
+    player = (
+        db.query(Player)
+        .filter(Player.id == player_id, Player.league_id == team.league_id, Player.team_id.is_(None))
+        .first()
+    )
     if player is None:
         raise MarketError("Player not available on the market")
 

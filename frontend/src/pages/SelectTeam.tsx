@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { NFLTeamOption, claimTeam, listAvailableTeams } from "../api/client";
+import { LeagueOption, NFLTeamOption, claimTeam, listAvailableLeagues, listAvailableTeams } from "../api/client";
 import PageTransition from "../components/PageTransition";
 
 type Step = "league" | "team";
 
 export default function SelectTeam() {
   const [step, setStep] = useState<Step>("league");
+  const [leagues, setLeagues] = useState<LeagueOption[]>([]);
+  const [leaguesError, setLeaguesError] = useState<string | null>(null);
+  const [selectedLeague, setSelectedLeague] = useState<string | null>(null);
   const [teams, setTeams] = useState<NFLTeamOption[]>([]);
   const [teamsError, setTeamsError] = useState<string | null>(null);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
@@ -16,21 +19,33 @@ export default function SelectTeam() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    listAvailableTeams()
-      .then(setTeams)
-      .catch(() => setTeamsError("Nem sikerült betölteni a csapatlistát."));
+    listAvailableLeagues()
+      .then((data) => {
+        setLeagues(data);
+        setSelectedLeague((prev) => prev ?? data[0]?.key ?? null);
+      })
+      .catch(() => setLeaguesError("Nem sikerült betölteni a ligalistát."));
   }, []);
 
+  useEffect(() => {
+    if (step !== "team" || !selectedLeague) return;
+    setTeams([]);
+    setSelectedCode(null);
+    listAvailableTeams(selectedLeague)
+      .then(setTeams)
+      .catch(() => setTeamsError("Nem sikerült betölteni a csapatlistát."));
+  }, [step, selectedLeague]);
+
   async function handleClaim() {
-    if (!selectedCode) return;
+    if (!selectedCode || !selectedLeague) return;
     setError(null);
     setSubmitting(true);
     try {
-      await claimTeam(selectedCode);
+      await claimTeam(selectedLeague, selectedCode);
       navigate("/");
     } catch {
       setError("Nem sikerült lefoglalni ezt a csapatot. Lehet, hogy időközben más választotta.");
-      listAvailableTeams().then(setTeams).catch(() => undefined);
+      listAvailableTeams(selectedLeague).then(setTeams).catch(() => undefined);
     } finally {
       setSubmitting(false);
     }
@@ -49,7 +64,7 @@ export default function SelectTeam() {
         >
           <h1 className="text-2xl font-bold text-gridiron-accent">Válassz ligát és csapatot</h1>
           <p className="mb-6 text-sm text-slate-400">
-            A kiválasztott csapat teljes, jelenleg szabad rosterét megkapod.
+            A kiválasztott csapat jelenleg szabad rosterének legjobb játékosait megkapod.
           </p>
 
           <div className="mb-6 flex items-center gap-2 text-xs text-slate-500">
@@ -69,21 +84,28 @@ export default function SelectTeam() {
                 className="space-y-4"
               >
                 <label className="block text-sm text-slate-400">Liga</label>
+
+                {leaguesError && <p className="text-sm text-red-400">{leaguesError}</p>}
+
                 <select
-                  disabled
-                  value="nfl"
-                  className="w-full cursor-not-allowed rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-300 outline-none"
+                  value={selectedLeague ?? ""}
+                  onChange={(e) => setSelectedLeague(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-300 outline-none focus:border-gridiron-accent"
                 >
-                  <option value="nfl">NFL (amerikai futball)</option>
+                  {leagues.map((l) => (
+                    <option key={l.key} value={l.key}>
+                      {l.name}
+                    </option>
+                  ))}
                 </select>
-                <p className="text-xs text-slate-500">Egyelőre csak az NFL liga érhető el.</p>
 
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                   type="button"
+                  disabled={!selectedLeague}
                   onClick={() => setStep("team")}
-                  className="w-full rounded-lg bg-gridiron-accent py-2 font-semibold text-slate-950 transition hover:brightness-110"
+                  className="w-full rounded-lg bg-gridiron-accent py-2 font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-40"
                 >
                   Tovább
                 </motion.button>
@@ -99,7 +121,9 @@ export default function SelectTeam() {
                 transition={{ duration: 0.2 }}
                 className="space-y-4"
               >
-                <label className="block text-sm text-slate-400">Válassz NFL-csapatot</label>
+                <label className="block text-sm text-slate-400">
+                  Válassz csapatot ({leagues.find((l) => l.key === selectedLeague)?.name})
+                </label>
 
                 {teamsError && <p className="text-sm text-red-400">{teamsError}</p>}
 

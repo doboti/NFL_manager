@@ -13,6 +13,7 @@ class Player(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True, index=True)
+    league_id: Mapped[int] = mapped_column(ForeignKey("leagues.id"), nullable=False, index=True)
 
     first_name: Mapped[str] = mapped_column(String(50), nullable=False)
     last_name: Mapped[str] = mapped_column(String(50), nullable=False)

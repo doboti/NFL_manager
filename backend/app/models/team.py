@@ -15,6 +15,7 @@ class Team(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
+    league_id: Mapped[int] = mapped_column(ForeignKey("leagues.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     nfl_team_code: Mapped[str | None] = mapped_column(String(10), unique=True, nullable=True, index=True)
     is_bot: Mapped[bool] = mapped_column(Boolean, default=False)

@@ -217,13 +217,26 @@ export async function fetchCurrentUser() {
   return data;
 }
 
-export async function listAvailableTeams() {
-  const { data } = await apiClient.get<NFLTeamOption[]>("/teams/available");
+export interface LeagueOption {
+  key: string;
+  name: string;
+}
+
+export async function listAvailableLeagues() {
+  const { data } = await apiClient.get<LeagueOption[]>("/league/available");
   return data;
 }
 
-export async function claimTeam(nflTeamCode: string) {
-  const { data } = await apiClient.post<Team>("/teams/claim", { nfl_team_code: nflTeamCode });
+export async function listAvailableTeams(leagueKey: string) {
+  const { data } = await apiClient.get<NFLTeamOption[]>("/teams/available", { params: { league_key: leagueKey } });
+  return data;
+}
+
+export async function claimTeam(leagueKey: string, nflTeamCode: string) {
+  const { data } = await apiClient.post<Team>("/teams/claim", {
+    league_key: leagueKey,
+    nfl_team_code: nflTeamCode,
+  });
   return data;
 }
 

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.bots import apply_bot_progression, resolve_bot_trade_offers
-from app.core.clock import get_or_create_default_league, now_utc
+from app.core.clock import list_leagues, now_utc
 from app.core.economy import apply_player_salaries, apply_sponsor_payouts, apply_stadium_revenue
 from app.core.league_schedule import ensure_fixtures_scheduled
 from app.core.market import refill_market
@@ -13,9 +13,10 @@ from app.models.team import Team
 
 
 def run_daily_cycle(db: Session) -> dict:
-    league = get_or_create_default_league(db)
+    leagues = list_leagues(db)
 
-    ensure_fixtures_scheduled(db, league)
+    for league in leagues:
+        ensure_fixtures_scheduled(db, league)
 
     now = now_utc(db)
     due_matches = (
@@ -89,18 +90,29 @@ def run_daily_cycle(db: Session) -> dict:
             }
         )
 
-    new_market_players = refill_market(db)
+    new_market_players = 0
+    season_summaries = []
+    playoff_events = {}
+    bot_progression_total = 0
 
-    if league.phase == SeasonPhase.REGULAR:
-        advance_regular_season_day(db, league, now)
+    for league in leagues:
+        new_market_players += refill_market(db, league)
 
-    playoff_event = None
-    if league.phase == SeasonPhase.PLAYOFFS:
-        playoff_event = advance_playoffs(db, league, now)
+        if league.phase == SeasonPhase.REGULAR:
+            advance_regular_season_day(db, league, now)
 
-    bot_progression_count = apply_bot_progression(db, league)
+        if league.phase == SeasonPhase.PLAYOFFS:
+            event = advance_playoffs(db, league, now)
+            if event is not None:
+                playoff_events[league.key] = event
 
-    ensure_fixtures_scheduled(db, league)
+        bot_progression_total += apply_bot_progression(db, league)
+
+        ensure_fixtures_scheduled(db, league)
+
+        season_summaries.append(
+            {"league": league.key, "season": league.season, "phase": league.phase.value, "day": league.season_day}
+        )
 
     db.commit()
 
@@ -111,7 +123,7 @@ def run_daily_cycle(db: Session) -> dict:
         "economy": economy_summary,
         "new_market_players": new_market_players,
         "bot_trades": bot_trades,
-        "season": {"season": league.season, "phase": league.phase.value, "day": league.season_day},
-        "playoff_event": playoff_event,
-        "bot_progression_count": bot_progression_count,
+        "seasons": season_summaries,
+        "playoff_events": playoff_events,
+        "bot_progression_count": bot_progression_total,
     }

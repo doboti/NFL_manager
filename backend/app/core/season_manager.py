@@ -4,9 +4,8 @@ from sqlalchemy.orm import Session
 
 from app.core.game_data import (
     CONFERENCE_CHAMPION_BONUS,
+    LEAGUES,
     MATCH_HOUR,
-    NFL_DIVISIONS,
-    NFL_TEAM_CONFERENCE_BY_CODE,
     PLAYOFF_APPEARANCE_BONUS,
     REGULAR_SEASON_DAYS,
     SUPER_BOWL_WINNER_BONUS,
@@ -46,10 +45,18 @@ def advance_regular_season_day(db: Session, league: League, now: datetime) -> No
 
 
 def start_playoffs(db: Session, league: League, now: datetime) -> None:
-    teams_by_code = {t.nfl_team_code: t for t in db.query(Team).filter(Team.nfl_team_code.isnot(None))}
+    league_data = LEAGUES[league.key]
+    divisions = league_data["divisions"]
+    conference_by_code = league_data["team_conference_by_code"]
+    conferences = sorted(set(conference_by_code.values()))
+
+    teams_by_code = {
+        t.nfl_team_code: t
+        for t in db.query(Team).filter(Team.league_id == league.id, Team.nfl_team_code.isnot(None))
+    }
 
     division_winners = []
-    for codes in NFL_DIVISIONS.values():
+    for codes in divisions.values():
         division_teams = [teams_by_code[c] for c in codes if c in teams_by_code]
         if not division_teams:
             continue
@@ -57,11 +64,11 @@ def start_playoffs(db: Session, league: League, now: datetime) -> None:
         division_winners.append(division_teams[0])
 
     afc = sorted(
-        (t for t in division_winners if NFL_TEAM_CONFERENCE_BY_CODE.get(t.nfl_team_code) == "AFC"),
+        (t for t in division_winners if conference_by_code.get(t.nfl_team_code) == conferences[0]),
         key=lambda t: -_win_pct(t),
     )
     nfc = sorted(
-        (t for t in division_winners if NFL_TEAM_CONFERENCE_BY_CODE.get(t.nfl_team_code) == "NFC"),
+        (t for t in division_winners if conference_by_code.get(t.nfl_team_code) == conferences[1]),
         key=lambda t: -_win_pct(t),
     )
 
@@ -115,13 +122,16 @@ def advance_playoffs(db: Session, league: League, now: datetime) -> dict | None:
     if not round_matches or any(not m.played for m in round_matches):
         return None
 
+    conference_by_code = LEAGUES[league.key]["team_conference_by_code"]
+    conferences = sorted(set(conference_by_code.values()))
+
     winner_ids = [m.home_team_id if (m.home_score or 0) > (m.away_score or 0) else m.away_team_id for m in round_matches]
     winners = {t.id: t for t in db.query(Team).filter(Team.id.in_(winner_ids)).all()}
     scheduled_at = _next_match_slot(now)
 
     if league.current_playoff_round == "conference_semifinal":
-        afc_winners = [winners[w] for w in winner_ids if NFL_TEAM_CONFERENCE_BY_CODE.get(winners[w].nfl_team_code) == "AFC"]
-        nfc_winners = [winners[w] for w in winner_ids if NFL_TEAM_CONFERENCE_BY_CODE.get(winners[w].nfl_team_code) == "NFC"]
+        afc_winners = [winners[w] for w in winner_ids if conference_by_code.get(winners[w].nfl_team_code) == conferences[0]]
+        nfc_winners = [winners[w] for w in winner_ids if conference_by_code.get(winners[w].nfl_team_code) == conferences[1]]
 
         for group in (afc_winners, nfc_winners):
             if len(group) == 2:
@@ -172,11 +182,11 @@ def advance_playoffs(db: Session, league: League, now: datetime) -> dict | None:
     return None
 
 
-def reset_player_ratings(db: Session) -> dict:
+def reset_player_ratings(db: Session, league: League) -> dict:
     """Every player stays in the league permanently (no retirement) -- each
     new season just wipes out the previous season's training gains, so
     everyone starts back at their original imported rating."""
-    all_players = db.query(Player).all()
+    all_players = db.query(Player).filter(Player.league_id == league.id).all()
     for player in all_players:
         player.age += 1
         player.overall = player.base_overall
@@ -197,7 +207,7 @@ def _record_season_history(db: Session, league: League, champion_id: int) -> Non
         rounds_reached.setdefault(match.home_team_id, []).append(match.playoff_round)
         rounds_reached.setdefault(match.away_team_id, []).append(match.playoff_round)
 
-    for team in db.query(Team).all():
+    for team in db.query(Team).filter(Team.league_id == league.id).all():
         if team.id == champion_id:
             playoff_result = "champion"
         else:
@@ -225,9 +235,9 @@ def _record_season_history(db: Session, league: League, champion_id: int) -> Non
 def end_season(db: Session, league: League, now: datetime, champion_id: int) -> dict:
     _record_season_history(db, league, champion_id)
 
-    aging_result = reset_player_ratings(db)
+    aging_result = reset_player_ratings(db, league)
 
-    for team in db.query(Team).all():
+    for team in db.query(Team).filter(Team.league_id == league.id).all():
         team.wins = 0
         team.losses = 0
         team.ties = 0

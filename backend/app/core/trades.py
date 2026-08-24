@@ -27,6 +27,9 @@ def create_offer(
     if to_team is None:
         raise TradeError("Target team not found")
 
+    if to_team.league_id != from_team.league_id:
+        raise TradeError("Cannot trade with a team from a different league")
+
     target_player = db.query(Player).filter(Player.id == target_player_id, Player.team_id == to_team_id).first()
     if target_player is None:
         raise TradeError("Target player not found on that team")

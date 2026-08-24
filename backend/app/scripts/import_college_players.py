@@ -1,14 +1,17 @@
-"""One-off / periodic data import: populates the free-agent pool with real NFL
-rosters from ESPN's public (unofficial) site API.
+"""One-off / periodic data import: populates the college-football free-agent
+pool with real rosters from ESPN's public (unofficial) site API, for the
+32-team subset in game_data.COLLEGE_TEAMS (the only college teams ESPN
+actually has current roster data for that we've wired in).
 
-Only player names, ages and a link to ESPN's own hosted headshot image are
-stored -- no photo bytes are copied or re-hosted, the frontend hotlinks the
-ESPN CDN URL directly. There is no official rating in the source data, so
-`overall` is a synthesized value (loosely nudged by NFL experience), not a
-real skill rating.
+Only player names and a link to ESPN's own hosted headshot image are stored
+-- no photo bytes are copied or re-hosted. ESPN doesn't track an exact age
+for college athletes (amateur roster data), so age is a plausible 18-23
+random value; `overall` has no real-world source either and is synthesized,
+nudged by class year (freshman..senior) the same way the NFL import nudges
+by pro experience.
 
 Run inside the backend container:
-    docker compose exec backend python -m app.scripts.import_nfl_players
+    docker compose exec backend python -m app.scripts.import_college_players
 """
 
 import random
@@ -19,12 +22,11 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import get_or_create_league
 from app.core.database import SessionLocal
-from app.core.game_data import player_market_value
+from app.core.game_data import COLLEGE_TEAMS, player_market_value
 from app.models.enums import Position
 from app.models.player import Player
 
-TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams?limit=40"
-ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams/{team_id}/roster"
+ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/{team_id}/roster"
 REQUEST_TIMEOUT = 15
 DELAY_BETWEEN_TEAMS = 0.3
 
@@ -43,6 +45,7 @@ POSITION_MAP: dict[str, Position] = {
     "DT": Position.DEF,
     "NT": Position.DEF,
     "DE": Position.DEF,
+    "DL": Position.DEF,
     "EDGE": Position.DEF,
     "LB": Position.DEF,
     "OLB": Position.DEF,
@@ -56,41 +59,33 @@ POSITION_MAP: dict[str, Position] = {
 }
 
 
-def fetch_teams() -> list[dict]:
-    resp = requests.get(TEAMS_URL, timeout=REQUEST_TIMEOUT)
-    resp.raise_for_status()
-    data = resp.json()
-    return [t["team"] for t in data["sports"][0]["leagues"][0]["teams"]]
-
-
-def fetch_roster(team_id: str) -> dict:
-    resp = requests.get(ROSTER_URL.format(team_id=team_id), timeout=REQUEST_TIMEOUT)
+def fetch_roster(espn_team_id: str) -> dict:
+    resp = requests.get(ROSTER_URL.format(team_id=espn_team_id), timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
     return resp.json()
 
 
-def generate_overall(experience_years: int) -> int:
-    """No real rating exists in the source data; synthesize a plausible one."""
-    base = random.randint(52, 80)
-    veteran_bonus = min(experience_years, 10) * random.uniform(0.5, 1.5)
-    if random.random() > 0.93:
-        base += random.randint(10, 18)
-    return max(40, min(99, round(base + veteran_bonus)))
+def generate_overall(class_years: int) -> int:
+    """No real rating exists in the source data; synthesize a plausible one,
+    nudged up for upperclassmen the same way the NFL import nudges veterans."""
+    base = random.randint(48, 74)
+    class_bonus = min(class_years, 5) * random.uniform(1.0, 2.5)
+    if random.random() > 0.95:
+        base += random.randint(8, 15)
+    return max(38, min(95, round(base + class_bonus)))
 
 
 def import_players(db: Session) -> dict:
-    league = get_or_create_league(db, "nfl")
-    teams = fetch_teams()
+    league = get_or_create_league(db, "college")
     created = 0
     updated = 0
     skipped = 0
 
-    for team in teams:
-        team_id = team["id"]
-        abbreviation = team["abbreviation"]
-        print(f"Importing roster: {team['displayName']} ({abbreviation})")
+    for team in COLLEGE_TEAMS:
+        code = team["code"]
+        print(f"Importing roster: {team['name']} ({code})")
 
-        roster = fetch_roster(team_id)
+        roster = fetch_roster(team["espn_id"])
         for group in roster.get("athletes", []):
             if group.get("position") not in ACTIVE_GROUPS:
                 continue
@@ -106,14 +101,14 @@ def import_players(db: Session) -> dict:
                 display_name = athlete.get("displayName", "")
                 first_name = athlete.get("firstName") or display_name.split(" ")[0]
                 last_name = athlete.get("lastName") or display_name.split(" ")[-1]
-                age = athlete.get("age") or random.randint(22, 34)
-                experience_years = (athlete.get("experience") or {}).get("years", 0)
+                age = athlete.get("age") or random.randint(18, 23)
+                class_years = (athlete.get("experience") or {}).get("years", 1)
                 headshot = (athlete.get("headshot") or {}).get("href")
 
                 existing = db.query(Player).filter(Player.espn_id == espn_id).first()
 
                 if existing is None:
-                    overall = generate_overall(experience_years)
+                    overall = generate_overall(class_years)
                     player = Player(
                         team_id=None,
                         league_id=league.id,
@@ -126,17 +121,16 @@ def import_players(db: Session) -> dict:
                         market_price=max(1, round(player_market_value(BASE_MARKET_PRICE, overall, age))),
                         espn_id=espn_id,
                         photo_url=headshot,
-                        nfl_team=abbreviation,
+                        nfl_team=code,
                     )
                     db.add(player)
                     created += 1
                 else:
-                    existing.age = age
                     existing.photo_url = headshot
-                    existing.nfl_team = abbreviation
+                    existing.nfl_team = code
                     if existing.team_id is None:
                         existing.market_price = max(
-                            1, round(player_market_value(BASE_MARKET_PRICE, existing.overall, age))
+                            1, round(player_market_value(BASE_MARKET_PRICE, existing.overall, existing.age))
                         )
                     updated += 1
 

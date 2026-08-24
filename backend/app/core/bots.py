@@ -7,7 +7,7 @@ from app.core.clock import now_utc
 from app.core.game_data import (
     BOT_PROGRESSION_INTERVAL_DAYS,
     BOT_PROGRESSION_OVR_GAIN,
-    NFL_TEAMS,
+    LEAGUES,
     player_market_value,
 )
 from app.core.security import hash_password
@@ -23,13 +23,14 @@ from app.models.user import User
 BOT_ACCEPT_THRESHOLD = 0.9  # bots accept offers worth at least 90% of the target player's value
 
 
-def seed_bot_teams(db: Session) -> int:
-    """Fills every NFL team without a franchise yet with a lightweight AI-controlled
-    one, so there is always a full league to play matches and trade against."""
+def seed_bot_teams(db: Session, league: League) -> int:
+    """Fills every team in this league without a franchise yet with a
+    lightweight AI-controlled one, so there is always a full league to play
+    matches and trade against."""
     existing_codes = {code for (code,) in db.query(Team.nfl_team_code).filter(Team.nfl_team_code.isnot(None))}
     created = 0
 
-    for entry in NFL_TEAMS:
+    for entry in LEAGUES[league.key]["teams"]:
         code = entry["code"]
         if code in existing_codes:
             continue
@@ -49,11 +50,13 @@ def seed_bot_teams(db: Session) -> int:
                 db.add(bot_user)
                 db.flush()
 
-                team = Team(owner_id=bot_user.id, name=entry["name"], nfl_team_code=code, is_bot=True)
+                team = Team(
+                    owner_id=bot_user.id, league_id=league.id, name=entry["name"], nfl_team_code=code, is_bot=True
+                )
                 db.add(team)
                 db.flush()
 
-                assign_real_roster(db, team, code)
+                assign_real_roster(db, team, code, league.id)
         except IntegrityError:
             continue
 
@@ -75,7 +78,7 @@ def apply_bot_progression(db: Session, league: League) -> int:
     bot_players = (
         db.query(Player)
         .join(Team, Player.team_id == Team.id)
-        .filter(Team.is_bot.is_(True), Player.overall < 99)
+        .filter(Team.league_id == league.id, Team.is_bot.is_(True), Player.overall < 99)
         .all()
     )
     for player in bot_players:

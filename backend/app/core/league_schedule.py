@@ -55,7 +55,7 @@ def ensure_fixtures_scheduled(db: Session, league: League) -> int:
     now = now_utc(db).astimezone(LEAGUE_TZ)
     today = now.date()
 
-    teams = db.query(Team).all()
+    teams = db.query(Team).filter(Team.league_id == league.id).all()
     unscheduled = [t for t in teams if not _has_pending_match(db, t.id)]
 
     by_date: dict[date, list[Team]] = {}

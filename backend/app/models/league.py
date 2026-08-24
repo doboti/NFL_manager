@@ -11,6 +11,7 @@ class League(Base):
     __tablename__ = "leagues"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     season: Mapped[int] = mapped_column(default=1)
 
@@ -20,10 +21,5 @@ class League(Base):
     season_started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
-
-    # Dev/test-only virtual clock: added to real wall-clock time everywhere the
-    # game checks "now" against a training/upgrade/match timestamp, so an admin
-    # panel can fast-forward the whole simulation without waiting in real time.
-    time_offset_seconds: Mapped[int] = mapped_column(Integer, default=0)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.bots import seed_bot_teams
+from app.core.clock import list_leagues
 from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.market import refill_market
@@ -37,8 +38,9 @@ app.include_router(admin.router)
 def on_startup():
     db = SessionLocal()
     try:
-        refill_market(db)
-        seed_bot_teams(db)
+        for league in list_leagues(db):
+            refill_market(db, league)
+            seed_bot_teams(db, league)
     finally:
         db.close()
     start_scheduler()

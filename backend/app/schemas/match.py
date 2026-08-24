@@ -36,6 +36,6 @@ class DailyCycleSummary(BaseModel):
     economy: list[dict]
     new_market_players: int
     bot_trades: dict
-    season: dict
-    playoff_event: dict | None
+    seasons: list[dict]
+    playoff_events: dict
     bot_progression_count: int

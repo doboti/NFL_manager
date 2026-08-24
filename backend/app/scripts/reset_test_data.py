@@ -2,8 +2,9 @@
 franchise (sponsors, training, stadium upgrades, trade offers, matches,
 season/playoff state), so the app can be tried from a clean slate.
 
-Imported real NFL players are NOT deleted -- they're just returned to the
-free-agent pool (team_id cleared) so re-claiming a team works normally.
+Imported real players (NFL and college) are NOT deleted -- they're just
+returned to the free-agent pool (team_id cleared) so re-claiming a team
+works normally.
 
 Run inside the backend container:
     docker compose exec backend python -m app.scripts.reset_test_data
@@ -12,11 +13,14 @@ Run inside the backend container:
 from sqlalchemy.orm import Session
 
 from app.core.bots import seed_bot_teams
+from app.core.clock import list_leagues
 from app.core.database import SessionLocal
 from app.core.game_data import player_market_value
-from app.models.league import League
+from app.models.enums import SeasonPhase
+from app.models.game_clock import GameClock
 from app.models.match import Match
 from app.models.player import Player
+from app.models.season_history import SeasonHistory
 from app.models.sponsor import Sponsor
 from app.models.stadium_upgrade import StadiumUpgrade
 from app.models.team import Team
@@ -32,8 +36,21 @@ def reset_test_data(db: Session) -> dict:
         "stadium_upgrades": db.query(StadiumUpgrade).delete(),
         "training_sessions": db.query(TrainingSession).delete(),
         "sponsors": db.query(Sponsor).delete(),
-        "leagues": db.query(League).delete(),
+        "season_history": db.query(SeasonHistory).delete(),
+        "game_clock_reset": db.query(GameClock).delete(),
     }
+
+    # Leagues themselves aren't deleted -- every real player permanently
+    # belongs to one (Player.league_id), so recreating the rows would just
+    # orphan that FK. Reset each one's season/playoff state back to day one
+    # instead, which is what "clean slate" actually means here.
+    leagues = list_leagues(db)
+    for league in leagues:
+        league.season = 1
+        league.phase = SeasonPhase.REGULAR
+        league.season_day = 0
+        league.current_playoff_round = None
+    counts["leagues_reset"] = len(leagues)
 
     owned_players = db.query(Player).filter(Player.team_id.isnot(None)).all()
     for player in owned_players:
@@ -49,7 +66,10 @@ def reset_test_data(db: Session) -> dict:
 
     db.commit()
 
-    counts["bot_teams_seeded"] = seed_bot_teams(db)
+    bot_teams_seeded = 0
+    for league in leagues:
+        bot_teams_seeded += seed_bot_teams(db, league)
+    counts["bot_teams_seeded"] = bot_teams_seeded
     return counts
 
 

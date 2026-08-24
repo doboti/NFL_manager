@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.clock import get_or_create_league
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.core.game_data import NFL_TEAM_NAMES_BY_CODE, NFL_TEAMS
+from app.core.game_data import LEAGUES
 from app.core.team_setup import TeamClaimError, avg_overall_by_team, claim_team as claim_team_core, release_team as release_team_core
 from app.models.season_history import SeasonHistory
 from app.models.team import Team
@@ -23,8 +24,17 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 
 
 @router.get("/available", response_model=list[NFLTeamOption])
-def list_available_teams(db: Session = Depends(get_db)):
-    teams_by_code = {t.nfl_team_code: t for t in db.query(Team).filter(Team.nfl_team_code.isnot(None))}
+def list_available_teams(league_key: str, db: Session = Depends(get_db)):
+    if league_key not in LEAGUES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown league")
+
+    league = get_or_create_league(db, league_key)
+    db.commit()
+
+    teams_by_code = {
+        t.nfl_team_code: t
+        for t in db.query(Team).filter(Team.league_id == league.id, Team.nfl_team_code.isnot(None))
+    }
     return [
         NFLTeamOption(
             code=t["code"],
@@ -32,13 +42,22 @@ def list_available_teams(db: Session = Depends(get_db)):
             taken=t["code"] in teams_by_code and not teams_by_code[t["code"]].is_bot,
             controlled_by_bot=t["code"] in teams_by_code and teams_by_code[t["code"]].is_bot,
         )
-        for t in NFL_TEAMS
+        for t in LEAGUES[league_key]["teams"]
     ]
 
 
 @router.get("/", response_model=list[TeamSummary])
 def list_teams(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    teams = db.query(Team).filter(Team.owner_id != current_user.id).order_by(Team.name).all()
+    my_team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    if my_team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No team yet")
+
+    teams = (
+        db.query(Team)
+        .filter(Team.league_id == my_team.league_id, Team.owner_id != current_user.id)
+        .order_by(Team.name)
+        .all()
+    )
     avg_overall = avg_overall_by_team(db)
     return [
         TeamSummary(
@@ -96,20 +115,24 @@ def claim_team(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if payload.league_key not in LEAGUES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown league")
+
+    league = get_or_create_league(db, payload.league_key)
     code = payload.nfl_team_code.upper()
-    team_name = NFL_TEAM_NAMES_BY_CODE.get(code)
+    team_name = LEAGUES[payload.league_key]["team_names_by_code"].get(code)
     if team_name is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown NFL team")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unknown team")
 
     try:
-        team = claim_team_core(db, current_user, code, team_name)
+        team = claim_team_core(db, current_user, league, code, team_name)
         db.commit()
     except TeamClaimError as e:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     except IntegrityError:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This NFL team has already been claimed")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This team has already been claimed")
 
     db.refresh(team)
     return team

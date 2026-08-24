@@ -95,11 +95,12 @@ export default function AdminTab({ onTeamUpdate }: Props) {
             Lejátszott meccsek: {(lastResult.daily_cycle.matches as unknown[])?.length ?? 0}
           </div>
           <div className="text-xs text-slate-400">
-            Szezon: {JSON.stringify(lastResult.daily_cycle.season)}
+            Szezonok: {JSON.stringify(lastResult.daily_cycle.seasons)}
           </div>
-          {lastResult.daily_cycle.playoff_event ? (
+          {lastResult.daily_cycle.playoff_events &&
+          Object.keys(lastResult.daily_cycle.playoff_events as object).length > 0 ? (
             <div className="text-xs text-gridiron-cyan">
-              Rájátszás esemény: {JSON.stringify(lastResult.daily_cycle.playoff_event)}
+              Rájátszás események: {JSON.stringify(lastResult.daily_cycle.playoff_events)}
             </div>
           ) : null}
         </div>

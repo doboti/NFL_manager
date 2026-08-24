@@ -41,3 +41,8 @@ class ScheduledMatch(BaseModel):
     scheduled_at: datetime
     is_playoff: bool
     playoff_round: str | None
+
+
+class LeagueOption(BaseModel):
+    key: str
+    name: str

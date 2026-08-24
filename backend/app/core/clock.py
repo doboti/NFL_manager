@@ -2,43 +2,70 @@
 so an admin panel can fast-forward training/stadium/matches without waiting.
 Training, stadium upgrades, sponsor contracts, and match scheduling all read
 "now" through this module's `now_utc()`, so they all move with the virtual
-clock. See app/routers/admin.py.
+clock -- shared by every league, since it's a single admin testing tool, not
+a per-league concept. See app/routers/admin.py.
 """
 
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.game_data import LEAGUES
+from app.models.game_clock import GameClock
 from app.models.league import League
 from app.models.match import Match
 from app.models.sponsor import Sponsor
 from app.models.stadium_upgrade import StadiumUpgrade
 from app.models.training import TrainingSession
 
-DEFAULT_LEAGUE_NAME = "Franchise Liga"
+DEFAULT_LEAGUE_KEY = "nfl"
 
 
-def get_or_create_default_league(db: Session) -> League:
-    league = db.query(League).filter(League.name == DEFAULT_LEAGUE_NAME).first()
+def get_or_create_game_clock(db: Session) -> GameClock:
+    clock = db.query(GameClock).first()
+    if clock is None:
+        clock = GameClock()
+        db.add(clock)
+        db.flush()
+    return clock
+
+
+def get_or_create_league(db: Session, key: str) -> League:
+    league = db.query(League).filter(League.key == key).first()
     if league is None:
-        league = League(name=DEFAULT_LEAGUE_NAME)
+        league = League(key=key, name=LEAGUES[key]["name"])
         db.add(league)
         db.flush()
     return league
 
 
+def get_or_create_default_league(db: Session) -> League:
+    """Back-compat shorthand for the NFL league, used anywhere that hasn't
+    been made explicitly league-aware yet."""
+    return get_or_create_league(db, DEFAULT_LEAGUE_KEY)
+
+
+def list_leagues(db: Session) -> list[League]:
+    """Ensures every registered league (see game_data.LEAGUES) has a row,
+    then returns all of them -- the daily cycle and startup seeding loop
+    over this."""
+    for key in LEAGUES:
+        get_or_create_league(db, key)
+    return db.query(League).order_by(League.id).all()
+
+
 def now_utc(db: Session) -> datetime:
-    league = get_or_create_default_league(db)
-    return datetime.now(timezone.utc) + timedelta(seconds=league.time_offset_seconds)
+    clock = get_or_create_game_clock(db)
+    return datetime.now(timezone.utc) + timedelta(seconds=clock.time_offset_seconds)
 
 
 def get_offset_seconds(db: Session) -> int:
-    return get_or_create_default_league(db).time_offset_seconds
+    return get_or_create_game_clock(db).time_offset_seconds
 
 
 def advance_time(db: Session, hours: float) -> datetime:
-    league = get_or_create_default_league(db)
-    league.time_offset_seconds += round(hours * 3600)
+    clock = get_or_create_game_clock(db)
+    clock.time_offset_seconds += round(hours * 3600)
     db.commit()
     return now_utc(db)
 
@@ -51,12 +78,12 @@ def reset_time(db: Session) -> datetime:
     actually weeks in the future relative to the just-reset clock. Shift
     every such timestamp back by exactly the amount the offset shrank, so
     everyone's *remaining* duration is preserved instead of stranded."""
-    league = get_or_create_default_league(db)
-    delta = timedelta(seconds=league.time_offset_seconds)
-    league.time_offset_seconds = 0
+    clock = get_or_create_game_clock(db)
+    delta = timedelta(seconds=clock.time_offset_seconds)
+    clock.time_offset_seconds = 0
 
     if delta:
-        db.query(Match).filter(Match.league_id == league.id, Match.played.is_(False)).update(
+        db.query(Match).filter(Match.played.is_(False)).update(
             {Match.scheduled_at: Match.scheduled_at - delta}, synchronize_session=False
         )
         db.query(StadiumUpgrade).filter(StadiumUpgrade.collected.is_(False)).update(

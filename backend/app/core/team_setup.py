@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.models.enums import Position
+from app.models.league import League
 from app.models.player import Player
 from app.models.team import Team
 from app.models.user import User
@@ -26,12 +27,12 @@ def avg_overall_by_team(db: Session) -> dict[int, float]:
     return {team_id: round(float(avg), 1) for team_id, avg in rows}
 
 
-def get_team_by_code(db: Session, code: str) -> Team | None:
-    return db.query(Team).filter(Team.nfl_team_code == code).first()
+def get_team_by_code(db: Session, league_id: int, code: str) -> Team | None:
+    return db.query(Team).filter(Team.league_id == league_id, Team.nfl_team_code == code).first()
 
 
-def is_team_code_taken_by_human(db: Session, code: str) -> bool:
-    team = get_team_by_code(db, code)
+def is_team_code_taken_by_human(db: Session, league_id: int, code: str) -> bool:
+    team = get_team_by_code(db, league_id, code)
     return team is not None and not team.is_bot
 
 
@@ -56,12 +57,16 @@ def _cap_roster_to_top_by_position(db: Session, team: Team) -> None:
             player.asking_price = None
 
 
-def assign_real_roster(db: Session, team: Team, code: str) -> int:
-    """Hands the team every currently-unclaimed real player on that NFL
-    roster, then immediately caps it down to the 3 best per position (see
-    _cap_roster_to_top_by_position) -- the rest stay in the free-agent
-    pool, signable later via the transfer market."""
-    players = db.query(Player).filter(Player.nfl_team == code, Player.team_id.is_(None)).all()
+def assign_real_roster(db: Session, team: Team, code: str, league_id: int) -> int:
+    """Hands the team every currently-unclaimed real player on that team's
+    real-world roster, then immediately caps it down to the 3 best per
+    position (see _cap_roster_to_top_by_position) -- the rest stay in the
+    free-agent pool, signable later via the transfer market."""
+    players = (
+        db.query(Player)
+        .filter(Player.nfl_team == code, Player.league_id == league_id, Player.team_id.is_(None))
+        .all()
+    )
     for player in players:
         player.team_id = team.id
 
@@ -70,16 +75,16 @@ def assign_real_roster(db: Session, team: Team, code: str) -> int:
     return len(team.players)
 
 
-def claim_team(db: Session, user: User, code: str, team_name: str) -> Team:
+def claim_team(db: Session, user: User, league: League, code: str, team_name: str) -> Team:
     """Creates a fresh franchise for `code`, or -- if an AI bot currently runs that
     team -- hands the human the reins of that same (already-populated) franchise."""
     if db.query(Team).filter(Team.owner_id == user.id).first() is not None:
         raise TeamClaimError("You already have a team")
 
-    existing = get_team_by_code(db, code)
+    existing = get_team_by_code(db, league.id, code)
 
     if existing is not None and not existing.is_bot:
-        raise TeamClaimError("This NFL team has already been claimed")
+        raise TeamClaimError("This team has already been claimed")
 
     if existing is not None and existing.is_bot:
         old_owner_id = existing.owner_id
@@ -90,10 +95,10 @@ def claim_team(db: Session, user: User, code: str, team_name: str) -> Team:
         _cap_roster_to_top_by_position(db, existing)
         return existing
 
-    team = Team(owner_id=user.id, name=team_name, nfl_team_code=code)
+    team = Team(owner_id=user.id, league_id=league.id, name=team_name, nfl_team_code=code)
     db.add(team)
     db.flush()
-    assign_real_roster(db, team, code)
+    assign_real_roster(db, team, code, league.id)
     return team
 
 

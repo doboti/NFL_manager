@@ -36,6 +36,7 @@ class NFLTeamOption(BaseModel):
 
 
 class ClaimTeamRequest(BaseModel):
+    league_key: str
     nfl_team_code: str
 
 
