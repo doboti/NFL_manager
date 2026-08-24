@@ -360,7 +360,8 @@ export async function setLineup(
   rbIds: number[],
   wrIds: number[],
   teId: number,
-  defId: number
+  defId: number,
+  kId: number
 ) {
   const { data } = await apiClient.put<Player[]>("/roster/lineup", {
     qb_id: qbId,
@@ -368,6 +369,7 @@ export async function setLineup(
     wr_ids: wrIds,
     te_id: teId,
     def_id: defId,
+    k_id: kId,
   });
   return data;
 }

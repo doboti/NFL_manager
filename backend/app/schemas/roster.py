@@ -11,3 +11,4 @@ class SetLineupRequest(BaseModel):
     wr_ids: list[int]
     te_id: int
     def_id: int
+    k_id: int

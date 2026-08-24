@@ -35,6 +35,7 @@ function LineupPicker({ team, onTeamUpdate }: Props) {
   const [wrIds, setWrIds] = useState<(number | null)[]>([null, null]);
   const [teId, setTeId] = useState<number | null>(null);
   const [defId, setDefId] = useState<number | null>(null);
+  const [kId, setKId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -48,6 +49,7 @@ function LineupPicker({ team, onTeamUpdate }: Props) {
     setWrIds([wrs[0]?.id ?? null, wrs[1]?.id ?? null]);
     setTeId(starters.find((p) => p.position === "TE")?.id ?? null);
     setDefId(starters.find((p) => p.position === "DEF")?.id ?? null);
+    setKId(starters.find((p) => p.position === "K")?.id ?? null);
   }, [team.players]);
 
   const byPosition: Record<string, Player[]> = {
@@ -56,6 +58,7 @@ function LineupPicker({ team, onTeamUpdate }: Props) {
     WR: team.players.filter((p) => p.position === "WR"),
     TE: team.players.filter((p) => p.position === "TE"),
     DEF: team.players.filter((p) => p.position === "DEF"),
+    K: team.players.filter((p) => p.position === "K"),
   };
 
   const slots: { position: string; index?: number; value: number | null; onChange: (v: number | null) => void }[] = [
@@ -66,9 +69,10 @@ function LineupPicker({ team, onTeamUpdate }: Props) {
     { position: "WR", index: 2, value: wrIds[1], onChange: (v) => setWrIds([wrIds[0], v]) },
     { position: "TE", value: teId, onChange: setTeId },
     { position: "DEF", value: defId, onChange: setDefId },
+    { position: "K", value: kId, onChange: setKId },
   ];
 
-  const allChosen = [qbId, ...rbIds, ...wrIds, teId, defId];
+  const allChosen = [qbId, ...rbIds, ...wrIds, teId, defId, kId];
   const complete = allChosen.every((v) => v !== null);
   const nonNullChosen = allChosen.filter((v): v is number => v !== null);
   const hasDuplicates = new Set(nonNullChosen).size !== nonNullChosen.length;
@@ -79,7 +83,7 @@ function LineupPicker({ team, onTeamUpdate }: Props) {
     setError(null);
     setSaved(false);
     try {
-      await setLineup(qbId!, rbIds as number[], wrIds as number[], teId!, defId!);
+      await setLineup(qbId!, rbIds as number[], wrIds as number[], teId!, defId!, kId!);
       onTeamUpdate(await fetchMyTeam());
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);

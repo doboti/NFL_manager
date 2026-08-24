@@ -4,6 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
+from app.models.enums import Position
 from app.models.player import Player
 from app.models.team import Team
 from app.models.user import User
@@ -34,12 +35,39 @@ def is_team_code_taken_by_human(db: Session, code: str) -> bool:
     return team is not None and not team.is_bot
 
 
+PLAYERS_PER_POSITION = 3
+
+
+def _cap_roster_to_top_by_position(db: Session, team: Team) -> None:
+    """Keeps only the 3 best-overall players per position on the team,
+    releasing the rest back to the free-agent pool. Used both for a fresh
+    team and for a human taking over an already-populated bot team -- in
+    either case that's the moment the roster should shrink to what's
+    actually needed, not the full NFL depth chart."""
+    by_position: dict[Position, list[Player]] = {}
+    for player in team.players:
+        by_position.setdefault(player.position, []).append(player)
+
+    for position_players in by_position.values():
+        position_players.sort(key=lambda p: p.overall, reverse=True)
+        for player in position_players[PLAYERS_PER_POSITION:]:
+            player.team_id = None
+            player.listed_for_transfer = False
+            player.asking_price = None
+
+
 def assign_real_roster(db: Session, team: Team, code: str) -> int:
-    """Hands the team every currently-unclaimed real player on that NFL roster."""
+    """Hands the team every currently-unclaimed real player on that NFL
+    roster, then immediately caps it down to the 3 best per position (see
+    _cap_roster_to_top_by_position) -- the rest stay in the free-agent
+    pool, signable later via the transfer market."""
     players = db.query(Player).filter(Player.nfl_team == code, Player.team_id.is_(None)).all()
     for player in players:
         player.team_id = team.id
-    return len(players)
+
+    db.flush()
+    _cap_roster_to_top_by_position(db, team)
+    return len(team.players)
 
 
 def claim_team(db: Session, user: User, code: str, team_name: str) -> Team:
@@ -59,6 +87,7 @@ def claim_team(db: Session, user: User, code: str, team_name: str) -> Team:
         existing.is_bot = False
         db.flush()
         db.query(User).filter(User.id == old_owner_id, User.is_bot.is_(True)).delete()
+        _cap_roster_to_top_by_position(db, existing)
         return existing
 
     team = Team(owner_id=user.id, name=team_name, nfl_team_code=code)

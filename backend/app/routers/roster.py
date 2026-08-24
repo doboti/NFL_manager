@@ -85,7 +85,7 @@ def put_lineup(
     team = _get_team(current_user, db)
     try:
         return set_starting_lineup(
-            db, team, payload.qb_id, payload.rb_ids, payload.wr_ids, payload.te_id, payload.def_id
+            db, team, payload.qb_id, payload.rb_ids, payload.wr_ids, payload.te_id, payload.def_id, payload.k_id
         )
     except RosterError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

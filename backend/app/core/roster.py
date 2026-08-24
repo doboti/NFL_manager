@@ -95,6 +95,7 @@ def set_starting_lineup(
     wr_ids: list[int],
     te_id: int,
     def_id: int,
+    k_id: int,
 ) -> list[Player]:
     required: list[tuple[int, Position]] = [
         (qb_id, Position.QB),
@@ -102,6 +103,7 @@ def set_starting_lineup(
         *[(pid, Position.WR) for pid in wr_ids],
         (te_id, Position.TE),
         (def_id, Position.DEF),
+        (k_id, Position.K),
     ]
 
     if len(rb_ids) != 2 or len(wr_ids) != 2:
