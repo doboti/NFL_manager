@@ -51,6 +51,9 @@ export default function Dashboard() {
               {team.stadium_level} ({STADIUM_LEVELS[team.stadium_level].capacity.toLocaleString("hu-HU")} néző) ·{" "}
               {team.wins}Gy {team.losses}V {team.ties}D
             </p>
+            <p className="text-xs text-slate-500">
+              Napi fenntartás (fizetések): -{team.daily_salary_cost.toLocaleString("hu-HU")} FT
+            </p>
           </div>
           <div className="flex flex-col items-end gap-1">
             <p className="text-xs text-slate-500">

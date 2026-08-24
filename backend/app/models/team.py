@@ -5,6 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 from app.core.config import settings
+from app.core.game_data import player_daily_salary
 from app.core.schedule import next_match_time
 from app.models.enums import Tactic
 
@@ -35,3 +36,7 @@ class Team(Base):
     @property
     def next_match_at(self) -> datetime:
         return next_match_time(self.created_at)
+
+    @property
+    def daily_salary_cost(self) -> int:
+        return sum(player_daily_salary(p.overall) for p in self.players)

@@ -48,6 +48,7 @@ export interface Team {
   ties: number;
   created_at: string;
   next_match_at: string;
+  daily_salary_cost: number;
   players: Player[];
 }
 

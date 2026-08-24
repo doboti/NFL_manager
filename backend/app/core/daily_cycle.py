@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.bots import apply_bot_progression, resolve_bot_trade_offers
 from app.core.clock import get_or_create_default_league, now_utc
-from app.core.economy import apply_sponsor_payouts, apply_stadium_revenue
+from app.core.economy import apply_player_salaries, apply_sponsor_payouts, apply_stadium_revenue
 from app.core.league_schedule import ensure_fixtures_scheduled
 from app.core.market import refill_market
 from app.core.season_manager import advance_playoffs, advance_regular_season_day
@@ -73,16 +73,18 @@ def run_daily_cycle(db: Session) -> dict:
 
     db.flush()
 
-    teams = db.query(Team).options(joinedload(Team.sponsors)).all()
+    teams = db.query(Team).options(joinedload(Team.sponsors), joinedload(Team.players)).all()
     economy_summary = []
     for team in teams:
         stadium_revenue = apply_stadium_revenue(team)
         sponsor_revenue = apply_sponsor_payouts(db, team, won_today.get(team.id))
+        salary_cost = apply_player_salaries(team)
         economy_summary.append(
             {
                 "team": team.name,
                 "stadium_revenue": stadium_revenue,
                 "sponsor_revenue": sponsor_revenue,
+                "salary_cost": salary_cost,
                 "new_balance": team.franchise_capital,
             }
         )

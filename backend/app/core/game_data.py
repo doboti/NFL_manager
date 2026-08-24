@@ -127,6 +127,13 @@ SUPER_BOWL_WINNER_BONUS = 2_000_000
 BOT_PROGRESSION_INTERVAL_DAYS = 7
 BOT_PROGRESSION_OVR_GAIN = 1
 
+# --- player salaries (daily upkeep, deducted from every team incl. bots) ---
+BASE_DAILY_SALARY = 1_500
+
+
+def player_daily_salary(overall: int) -> int:
+    return round(BASE_DAILY_SALARY * (overall / 50) ** 2)
+
 
 def age_xp_multiplier(age: int) -> float:
     if 18 <= age <= 21:

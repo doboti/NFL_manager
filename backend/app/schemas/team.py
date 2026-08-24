@@ -20,6 +20,7 @@ class TeamOut(BaseModel):
     ties: int
     created_at: datetime
     next_match_at: datetime
+    daily_salary_cost: int
     players: list[PlayerOut] = []
 
 
