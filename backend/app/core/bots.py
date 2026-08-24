@@ -1,5 +1,6 @@
 import uuid
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.clock import now_utc
@@ -33,20 +34,29 @@ def seed_bot_teams(db: Session) -> int:
         if code in existing_codes:
             continue
 
-        bot_user = User(
-            email=f"bot-{code.lower()}@bots.local",
-            hashed_password=hash_password(uuid.uuid4().hex),
-            display_name=f"{entry['name']} (AI)",
-            is_bot=True,
-        )
-        db.add(bot_user)
-        db.flush()
+        # Runs on every backend startup, so it can race a concurrent caller
+        # (e.g. a manual reset script) also seeding this same team. A nested
+        # transaction lets that single insert fail without aborting the rest
+        # of the loop -- the other side's row wins, we just skip ours.
+        try:
+            with db.begin_nested():
+                bot_user = User(
+                    email=f"bot-{code.lower()}@bots.local",
+                    hashed_password=hash_password(uuid.uuid4().hex),
+                    display_name=f"{entry['name']} (AI)",
+                    is_bot=True,
+                )
+                db.add(bot_user)
+                db.flush()
 
-        team = Team(owner_id=bot_user.id, name=entry["name"], nfl_team_code=code, is_bot=True)
-        db.add(team)
-        db.flush()
+                team = Team(owner_id=bot_user.id, name=entry["name"], nfl_team_code=code, is_bot=True)
+                db.add(team)
+                db.flush()
 
-        assign_real_roster(db, team, code)
+                assign_real_roster(db, team, code)
+        except IntegrityError:
+            continue
+
         created += 1
 
     if created:
