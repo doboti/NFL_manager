@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     training_slots_per_day: int = 3
     training_duration_hours: int = 18
 
+    cors_origins: str = "http://localhost:5173,http://localhost:3000"
+
     class Config:
         env_file = ".env"
 

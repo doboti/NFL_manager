@@ -33,7 +33,10 @@ cd /opt/nfl-manager
 # gets synced automatically by the deploy workflow, no need to copy it by hand
 cp .env.example .env
 # edit .env: set POSTGRES_PASSWORD and JWT_SECRET_KEY to real random values
-# generate each with: openssl rand -hex 32
+# (generate each with: openssl rand -hex 32), and set FRONTEND_ORIGIN to
+# wherever the frontend will actually be served from (must match exactly,
+# including scheme and port, or the backend's CORS check rejects every
+# request from the browser with a 400 on the preflight)
 ```
 
 Before the first deploy has run, `docker-compose.prod.yml` won't exist here
