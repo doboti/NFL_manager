@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gridiron
+      POSTGRES_PASSWORD: gridiron
+      POSTGRES_DB: gridiron
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gridiron"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://gridiron:gridiron@db:5432/gridiron
+      JWT_SECRET_KEY: dev-secret-change-me
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_URL: http://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

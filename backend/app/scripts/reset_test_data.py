@@ -1,0 +1,62 @@
+"""Dev/testing utility: wipes all users, teams, and everything tied to a
+franchise (sponsors, training, stadium upgrades, trade offers, matches,
+season/playoff state), so the app can be tried from a clean slate.
+
+Imported real NFL players are NOT deleted -- they're just returned to the
+free-agent pool (team_id cleared) so re-claiming a team works normally.
+
+Run inside the backend container:
+    docker compose exec backend python -m app.scripts.reset_test_data
+"""
+
+from sqlalchemy.orm import Session
+
+from app.core.bots import seed_bot_teams
+from app.core.database import SessionLocal
+from app.core.game_data import player_market_value
+from app.models.league import League
+from app.models.match import Match
+from app.models.player import Player
+from app.models.sponsor import Sponsor
+from app.models.stadium_upgrade import StadiumUpgrade
+from app.models.team import Team
+from app.models.trade_offer import TradeOffer
+from app.models.training import TrainingSession
+from app.models.user import User
+
+
+def reset_test_data(db: Session) -> dict:
+    counts = {
+        "trade_offers": db.query(TradeOffer).delete(),
+        "matches": db.query(Match).delete(),
+        "stadium_upgrades": db.query(StadiumUpgrade).delete(),
+        "training_sessions": db.query(TrainingSession).delete(),
+        "sponsors": db.query(Sponsor).delete(),
+        "leagues": db.query(League).delete(),
+    }
+
+    owned_players = db.query(Player).filter(Player.team_id.isnot(None)).all()
+    for player in owned_players:
+        player.team_id = None
+        player.listed_for_transfer = False
+        player.asking_price = None
+        player.market_price = max(1, round(player_market_value(1000, player.overall, player.age)))
+    counts["players_freed"] = len(owned_players)
+    db.flush()
+
+    counts["teams"] = db.query(Team).delete()
+    counts["users"] = db.query(User).delete()
+
+    db.commit()
+
+    counts["bot_teams_seeded"] = seed_bot_teams(db)
+    return counts
+
+
+if __name__ == "__main__":
+    session = SessionLocal()
+    try:
+        summary = reset_test_data(session)
+        print(summary)
+    finally:
+        session.close()
