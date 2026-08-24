@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Team, fetchCurrentUser, fetchMyTeam } from "../api/client";
+import { Team, fetchMyTeam } from "../api/client";
 import { STADIUM_LEVELS } from "../gameData";
 import { useAuth } from "../context/AuthContext";
 import AnimatedNumber from "../components/AnimatedNumber";
@@ -12,11 +12,10 @@ import MarketTab from "./dashboard/MarketTab";
 import TradesTab from "./dashboard/TradesTab";
 import MatchesTab from "./dashboard/MatchesTab";
 import LeagueTab from "./dashboard/LeagueTab";
-import AdminTab from "./dashboard/AdminTab";
 
-type TabKey = "overview" | "roster" | "market" | "trades" | "matches" | "league" | "admin";
+type TabKey = "overview" | "roster" | "market" | "trades" | "matches" | "league";
 
-const BASE_TABS: { key: TabKey; label: string }[] = [
+const TABS: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Áttekintés" },
   { key: "league", label: "Liga" },
   { key: "roster", label: "Keret" },
@@ -29,19 +28,13 @@ export default function Dashboard() {
   const [team, setTeam] = useState<Team | null>(null);
   const [tab, setTab] = useState<TabKey>("overview");
   const [error, setError] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const { logout } = useAuth();
 
   useEffect(() => {
     fetchMyTeam()
       .then(setTeam)
       .catch(() => setError("Nem sikerült betölteni a franchise adatait."));
-    fetchCurrentUser()
-      .then((user) => setIsAdmin(user.is_admin))
-      .catch(() => setIsAdmin(false));
   }, []);
-
-  const TABS = isAdmin ? [...BASE_TABS, { key: "admin" as const, label: "Admin" }] : BASE_TABS;
 
   if (error && !team) return <p className="p-8 text-red-400">{error}</p>;
   if (!team) return <SkeletonDashboard />;
@@ -90,7 +83,6 @@ export default function Dashboard() {
         {tab === "market" && <MarketTab team={team} onTeamUpdate={setTeam} />}
         {tab === "trades" && <TradesTab team={team} onTeamUpdate={setTeam} />}
         {tab === "matches" && <MatchesTab team={team} />}
-        {tab === "admin" && isAdmin && <AdminTab team={team} onTeamUpdate={setTeam} />}
       </div>
     </PageTransition>
   );

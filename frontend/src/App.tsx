@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
-import { fetchMyTeam } from "./api/client";
+import { fetchCurrentUser, fetchMyTeam } from "./api/client";
 import { SkeletonDashboard } from "./components/Skeleton";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import SelectTeam from "./pages/SelectTeam";
 import Dashboard from "./pages/Dashboard";
+import AdminPage from "./pages/AdminPage";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { token } = useAuth();
@@ -46,6 +47,39 @@ function RequireNoTeam({ children }: { children: JSX.Element }) {
   return children;
 }
 
+type AdminStatus = "loading" | "admin" | "not-admin";
+
+function useAdminStatus(): AdminStatus {
+  const [status, setStatus] = useState<AdminStatus>("loading");
+  const { token } = useAuth();
+
+  useEffect(() => {
+    if (!token) return;
+    setStatus("loading");
+    fetchCurrentUser()
+      .then((user) => setStatus(user.is_admin ? "admin" : "not-admin"))
+      .catch(() => setStatus("not-admin"));
+  }, [token]);
+
+  return status;
+}
+
+// Admin accounts skip league/team selection entirely -- they only get the
+// admin console, never the regular player dashboard.
+function RedirectAdminAway({ children }: { children: JSX.Element }) {
+  const status = useAdminStatus();
+  if (status === "loading") return <SkeletonDashboard />;
+  if (status === "admin") return <Navigate to="/admin" replace />;
+  return children;
+}
+
+function RequireAdmin({ children }: { children: JSX.Element }) {
+  const status = useAdminStatus();
+  if (status === "loading") return <SkeletonDashboard />;
+  if (status === "not-admin") return <Navigate to="/" replace />;
+  return children;
+}
+
 export default function App() {
   const location = useLocation();
 
@@ -55,12 +89,24 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route
+          path="/admin"
+          element={
+            <RequireAuth>
+              <RequireAdmin>
+                <AdminPage />
+              </RequireAdmin>
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/select-team"
           element={
             <RequireAuth>
-              <RequireNoTeam>
-                <SelectTeam />
-              </RequireNoTeam>
+              <RedirectAdminAway>
+                <RequireNoTeam>
+                  <SelectTeam />
+                </RequireNoTeam>
+              </RedirectAdminAway>
             </RequireAuth>
           }
         />
@@ -68,9 +114,11 @@ export default function App() {
           path="/"
           element={
             <RequireAuth>
-              <RequireTeam>
-                <Dashboard />
-              </RequireTeam>
+              <RedirectAdminAway>
+                <RequireTeam>
+                  <Dashboard />
+                </RequireTeam>
+              </RedirectAdminAway>
             </RequireAuth>
           }
         />

@@ -484,3 +484,21 @@ export async function resetTime() {
   const { data } = await apiClient.post<TimeStatus>("/admin/reset-time");
   return data;
 }
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  display_name: string;
+  is_bot: boolean;
+  is_admin: boolean;
+  team_name: string | null;
+}
+
+export async function listAdminUsers() {
+  const { data } = await apiClient.get<AdminUser[]>("/admin/users");
+  return data;
+}
+
+export async function deleteAdminUser(userId: number) {
+  await apiClient.delete(`/admin/users/${userId}`);
+}

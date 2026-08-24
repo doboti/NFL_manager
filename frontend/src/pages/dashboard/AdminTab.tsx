@@ -4,8 +4,7 @@ import { AdvanceTimeResponse, Team, advanceTime, fetchMyTeam, resetTime } from "
 import { useVirtualTime } from "../../context/TimeContext";
 
 interface Props {
-  team: Team;
-  onTeamUpdate: (team: Team) => void;
+  onTeamUpdate?: (team: Team) => void;
 }
 
 const QUICK_JUMPS = [1, 6, 12, 24];
@@ -24,7 +23,7 @@ export default function AdminTab({ onTeamUpdate }: Props) {
       setOffsetSeconds(result.time.offset_seconds);
       setLastResult(result);
       // stadium level / capital may have changed via the daily cycle
-      onTeamUpdate(await fetchMyTeam());
+      if (onTeamUpdate) onTeamUpdate(await fetchMyTeam());
     } catch {
       setError("Az idő előreléptetése nem sikerült.");
     } finally {
@@ -39,7 +38,7 @@ export default function AdminTab({ onTeamUpdate }: Props) {
       const status = await resetTime();
       setOffsetSeconds(status.offset_seconds);
       setLastResult(null);
-      onTeamUpdate(await fetchMyTeam());
+      if (onTeamUpdate) onTeamUpdate(await fetchMyTeam());
     } catch {
       setError("Az idő visszaállítása nem sikerült.");
     } finally {

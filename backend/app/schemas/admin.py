@@ -15,3 +15,12 @@ class AdvanceTimeRequest(BaseModel):
 class AdvanceTimeResponse(BaseModel):
     time: TimeStatus
     daily_cycle: dict | None
+
+
+class AdminUserOut(BaseModel):
+    id: int
+    email: str
+    display_name: str
+    is_bot: bool
+    is_admin: bool
+    team_name: str | None
