@@ -4,6 +4,7 @@ import { Team, fetchMyTeam } from "../api/client";
 import { STADIUM_LEVELS } from "../gameData";
 import { useAuth } from "../context/AuthContext";
 import AnimatedNumber from "../components/AnimatedNumber";
+import GameClock from "../components/GameClock";
 import PageTransition from "../components/PageTransition";
 import { SkeletonDashboard } from "../components/Skeleton";
 import OverviewTab from "./dashboard/OverviewTab";
@@ -51,14 +52,19 @@ export default function Dashboard() {
               {team.wins}Gy {team.losses}V {team.ties}D
             </p>
           </div>
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={logout}
-            className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-red-400 hover:text-red-400"
-          >
-            Kijelentkezés
-          </motion.button>
+          <div className="flex flex-col items-end gap-1">
+            <p className="text-xs text-slate-500">
+              Játékidő: <GameClock />
+            </p>
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={logout}
+              className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-red-400 hover:text-red-400"
+            >
+              Kijelentkezés
+            </motion.button>
+          </div>
         </div>
 
         <div className="mb-8 flex flex-wrap gap-2 border-b border-slate-800 pb-3">
