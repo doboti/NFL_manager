@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.models.league import League
+from app.models.match import Match
 
 DEFAULT_LEAGUE_NAME = "Franchise Liga"
 
@@ -41,7 +42,14 @@ def advance_time(db: Session, hours: float) -> datetime:
 
 
 def reset_time(db: Session) -> datetime:
+    """Zeroing the offset alone would leave any not-yet-played matches
+    stamped with scheduled_at times computed under the old (larger) offset
+    -- e.g. weeks "in the future" relative to the just-reset clock. Clear
+    them so the next daily cycle's ensure_fixtures_scheduled recreates
+    fresh ones anchored to the new time; already-played matches (and every
+    other stat) are untouched."""
     league = get_or_create_default_league(db)
     league.time_offset_seconds = 0
+    db.query(Match).filter(Match.league_id == league.id, Match.played.is_(False)).delete()
     db.commit()
     return now_utc(db)

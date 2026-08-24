@@ -75,8 +75,8 @@ export default function OverviewTab({ team, onTeamUpdate }: Props) {
       <div className="mb-6 rounded-lg border border-slate-800 bg-slate-900 p-4">
         <h2 className="mb-1 font-semibold">Liga</h2>
         <p className="text-sm text-slate-400">
-          Következő meccs: {new Date(team.next_match_at).toLocaleString("hu-HU")} · hátra:{" "}
-          <CountdownText target={team.next_match_at} />
+          Következő meccs: {new Date(upcoming ? upcoming.scheduled_at : team.next_match_at).toLocaleString("hu-HU")} ·
+          hátra: <CountdownText target={upcoming ? upcoming.scheduled_at : team.next_match_at} />
         </p>
         {upcoming && (
           <p className="mt-1 text-sm text-slate-300">
