@@ -15,3 +15,13 @@ class LoginRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class MeResponse(BaseModel):
+    id: int
+    email: str
+    display_name: str
+    is_admin: bool
+
+    class Config:
+        from_attributes = True

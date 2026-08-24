@@ -204,6 +204,18 @@ export async function login(email: string, password: string) {
   return data.access_token;
 }
 
+export interface CurrentUser {
+  id: number;
+  email: string;
+  display_name: string;
+  is_admin: boolean;
+}
+
+export async function fetchCurrentUser() {
+  const { data } = await apiClient.get<CurrentUser>("/auth/me");
+  return data;
+}
+
 export async function listAvailableTeams() {
   const { data } = await apiClient.get<NFLTeamOption[]>("/teams/available");
   return data;
