@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   DivisionStandings,
   ScheduledMatch,
   SeasonHistoryEntry,
   SeasonStatus,
   Team,
+  TeamRoster,
+  fetchTeamRoster,
   getLeagueSchedule,
   getSeasonHistory,
   getSeasonStatus,
@@ -48,6 +50,9 @@ export default function LeagueTab({ team }: Props) {
   const [schedule, setSchedule] = useState<ScheduledMatch[] | null>(null);
   const [history, setHistory] = useState<SeasonHistoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rosterModalOpen, setRosterModalOpen] = useState(false);
+  const [rosterView, setRosterView] = useState<TeamRoster | null>(null);
+  const [rosterError, setRosterError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule(), getSeasonHistory()])
@@ -59,6 +64,23 @@ export default function LeagueTab({ team }: Props) {
       })
       .catch(() => setError("Nem sikerült betölteni a liga adatait."));
   }, []);
+
+  async function openRoster(teamId: number) {
+    setRosterModalOpen(true);
+    setRosterView(null);
+    setRosterError(null);
+    try {
+      setRosterView(await fetchTeamRoster(teamId));
+    } catch {
+      setRosterError("Nem sikerült betölteni a csapat rosterét.");
+    }
+  }
+
+  function closeRoster() {
+    setRosterModalOpen(false);
+    setRosterView(null);
+    setRosterError(null);
+  }
 
   const conferences = standings ? Array.from(new Set(standings.map((d) => d.conference))) : [];
 
@@ -116,7 +138,12 @@ export default function LeagueTab({ team }: Props) {
                                 className={t.id === team.id ? "font-bold text-gridiron-accent" : "text-slate-300"}
                               >
                                 <td className="py-0.5 truncate">
-                                  {t.name}
+                                  <button
+                                    onClick={() => openRoster(t.id)}
+                                    className="truncate text-left hover:underline"
+                                  >
+                                    {t.name}
+                                  </button>
                                   {t.is_bot && <span className="ml-1 text-[10px] text-gridiron-cyan">AI</span>}
                                 </td>
                                 <td className="py-0.5 text-right">{t.wins}</td>
@@ -201,6 +228,73 @@ export default function LeagueTab({ team }: Props) {
           </div>
         </>
       )}
+
+      <AnimatePresence>
+        {rosterModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+            onClick={closeRoster}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+              className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg border border-slate-800 bg-slate-900 p-4"
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-lg font-semibold">{rosterView?.name ?? "Roster"}</h3>
+                <button onClick={closeRoster} className="text-slate-400 hover:text-slate-200">
+                  Bezárás
+                </button>
+              </div>
+
+              {rosterError && <p className="text-sm text-red-400">{rosterError}</p>}
+
+              {!rosterView && !rosterError && (
+                <div className="space-y-2">
+                  <SkeletonBlock className="h-8 w-full" />
+                  <SkeletonBlock className="h-8 w-full" />
+                  <SkeletonBlock className="h-8 w-full" />
+                </div>
+              )}
+
+              {rosterView && (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[10px] uppercase text-slate-600">
+                      <th className="pb-1 font-medium">Név</th>
+                      <th className="pb-1 font-medium">Poszt</th>
+                      <th className="pb-1 text-right font-medium">Kor</th>
+                      <th className="pb-1 text-right font-medium">OVR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...rosterView.players]
+                      .sort((a, b) => b.overall - a.overall)
+                      .map((p) => (
+                        <tr key={p.id} className="border-t border-slate-800 text-slate-300">
+                          <td className="py-1">
+                            {p.first_name} {p.last_name}
+                            {p.is_starter && (
+                              <span className="ml-1 text-[10px] text-gridiron-accent">kezdő</span>
+                            )}
+                          </td>
+                          <td className="py-1 text-slate-500">{p.position}</td>
+                          <td className="py-1 text-right">{p.age}</td>
+                          <td className="py-1 text-right font-semibold text-gridiron-accent">{p.overall}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
