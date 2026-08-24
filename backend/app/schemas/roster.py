@@ -6,9 +6,13 @@ class ListForTransferRequest(BaseModel):
 
 
 class SetLineupRequest(BaseModel):
-    qb_id: int
-    rb_ids: list[int]
-    wr_ids: list[int]
-    te_id: int
-    def_id: int
-    k_id: int
+    """Any field left null gets auto-filled server-side with the best
+    available player at that position -- a slot doesn't need an explicit
+    pick to be saved."""
+
+    qb_id: int | None = None
+    rb_ids: list[int | None] = [None, None]
+    wr_ids: list[int | None] = [None, None]
+    te_id: int | None = None
+    def_id: int | None = None
+    k_id: int | None = None

@@ -75,17 +75,16 @@ function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { train
   ];
 
   const allChosen = [qbId, ...rbIds, ...wrIds, teId, defId, kId];
-  const complete = allChosen.every((v) => v !== null);
   const nonNullChosen = allChosen.filter((v): v is number => v !== null);
   const hasDuplicates = new Set(nonNullChosen).size !== nonNullChosen.length;
 
   async function handleSave() {
-    if (!complete || hasDuplicates) return;
+    if (hasDuplicates) return;
     setBusy(true);
     setError(null);
     setSaved(false);
     try {
-      await setLineup(qbId!, rbIds as number[], wrIds as number[], teId!, defId!, kId!);
+      await setLineup(qbId, rbIds, wrIds, teId, defId, kId);
       onTeamUpdate(await fetchMyTeam());
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -135,7 +134,7 @@ function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { train
       <motion.button
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
-        disabled={!complete || hasDuplicates || busy}
+        disabled={hasDuplicates || busy}
         onClick={handleSave}
         className="mt-3 rounded-lg bg-gridiron-accent px-4 py-1.5 text-sm font-semibold text-slate-950 disabled:opacity-40"
       >

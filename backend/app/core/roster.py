@@ -92,35 +92,49 @@ def buy_transfer_listed_player(db: Session, buyer_team: Team, player_id: int) ->
 def set_starting_lineup(
     db: Session,
     team: Team,
-    qb_id: int,
-    rb_ids: list[int],
-    wr_ids: list[int],
-    te_id: int,
-    def_id: int,
-    k_id: int,
+    qb_id: int | None,
+    rb_ids: list[int | None],
+    wr_ids: list[int | None],
+    te_id: int | None,
+    def_id: int | None,
+    k_id: int | None,
 ) -> list[Player]:
-    required: list[tuple[int, Position]] = [
+    """Any slot left as None gets auto-filled with the best-OVR available
+    (not already used, not currently training) player at that position --
+    matching what the UI has always told players would happen, which
+    previously only applied at simulation time, not at save time: the form
+    actually required every slot filled in before the button would even
+    enable, so a single-slot change was often impossible to save at all."""
+    if len(rb_ids) != 2 or len(wr_ids) != 2:
+        raise RosterError("Exactly 2 RB and 2 WR slots are required")
+
+    slots: list[tuple[int | None, Position]] = [
         (qb_id, Position.QB),
-        *[(pid, Position.RB) for pid in rb_ids],
-        *[(pid, Position.WR) for pid in wr_ids],
+        (rb_ids[0], Position.RB),
+        (rb_ids[1], Position.RB),
+        (wr_ids[0], Position.WR),
+        (wr_ids[1], Position.WR),
         (te_id, Position.TE),
         (def_id, Position.DEF),
         (k_id, Position.K),
     ]
 
-    if len(rb_ids) != 2 or len(wr_ids) != 2:
-        raise RosterError("Exactly 2 RB and 2 WR are required")
-
-    ids = [pid for pid, _ in required]
-    if len(set(ids)) != len(ids):
+    explicit_ids = [pid for pid, _ in slots if pid is not None]
+    if len(set(explicit_ids)) != len(explicit_ids):
         raise RosterError("A player cannot fill two slots at once")
 
-    players = db.query(Player).filter(Player.id.in_(ids), Player.team_id == team.id).all()
-    players_by_id = {p.id: p for p in players}
+    roster_players = team.players
+    players_by_id = {p.id: p for p in roster_players}
+    by_position: dict[Position, list[Player]] = {}
+    for p in roster_players:
+        by_position.setdefault(p.position, []).append(p)
 
     training_ids = training_player_ids(db, team.id, now_utc(db))
 
-    for pid, expected_position in required:
+    used_ids: set[int] = set()
+    for pid, expected_position in slots:
+        if pid is None:
+            continue
         player = players_by_id.get(pid)
         if player is None:
             raise RosterError("Player not found on this team")
@@ -128,9 +142,20 @@ def set_starting_lineup(
             raise RosterError(f"{player.first_name} {player.last_name} is not a {expected_position.value}")
         if pid in training_ids:
             raise RosterError(f"{player.first_name} {player.last_name} is currently training and can't start")
+        used_ids.add(pid)
+
+    for pid, expected_position in slots:
+        if pid is not None:
+            continue
+        candidates = [
+            p for p in by_position.get(expected_position, []) if p.id not in used_ids and p.id not in training_ids
+        ]
+        if not candidates:
+            raise RosterError(f"No available {expected_position.value} player to auto-fill that slot")
+        used_ids.add(max(candidates, key=lambda p: p.overall).id)
 
     for player in team.players:
-        player.is_starter = player.id in players_by_id
+        player.is_starter = player.id in used_ids
 
     db.commit()
     return [p for p in team.players if p.is_starter]
