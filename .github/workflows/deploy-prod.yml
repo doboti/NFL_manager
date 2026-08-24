@@ -13,28 +13,22 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - name: Debug secret presence
-        env:
-          SSH_HOST: ${{ secrets.SSH_HOST }}
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          TAILSCALE_AUTHKEY: ${{ secrets.TAILSCALE_AUTHKEY }}
-        run: |
-          echo "Environment used by this job: production"
-          for name in SSH_HOST SSH_USER SSH_PRIVATE_KEY DEPLOY_PATH TAILSCALE_AUTHKEY; do
-            value="${!name}"
-            if [ -z "$value" ]; then
-              echo "$name: EMPTY"
-            else
-              echo "$name: set (length=${#value})"
-            fi
-          done
+      - uses: actions/checkout@v4
 
       - name: Connect to Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+
+      - name: Sync docker-compose.prod.yml to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "docker-compose.prod.yml"
+          target: ${{ secrets.DEPLOY_PATH }}
+          strip_components: 0
 
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1

@@ -20,7 +20,7 @@ services:
       DATABASE_URL: postgresql+psycopg2://gridiron:${POSTGRES_PASSWORD}@db:5432/gridiron
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
     ports:
-      - "8000:8000"
+      - "8002:8000"
     depends_on:
       db:
         condition: service_healthy

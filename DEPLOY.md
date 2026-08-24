@@ -7,10 +7,11 @@ Two separate GitHub Actions workflows:
   Registry (GHCR), tagged both `:latest` and `:<commit-sha>`. It never
   touches the server.
 - **`.github/workflows/deploy-prod.yml`** — runs only when you trigger it by
-  hand (GitHub → Actions → "Deploy to production" → Run workflow). SSHes
-  into the server and runs `docker compose pull && up -d` for the image tag
-  you choose (defaults to `latest`, or type a specific commit SHA to pin/roll
-  back).
+  hand (GitHub → Actions → "Deploy to production" → Run workflow). Copies the
+  repo's current `docker-compose.prod.yml` onto the server (so the server
+  never runs a stale, manually-edited copy), then runs
+  `docker compose pull && up -d` for the image tag you choose (defaults to
+  `latest`, or type a specific commit SHA to pin/roll back).
 
 So the day-to-day flow is: develop and test locally with `docker-compose.yml`
 (dev — hot reload, bind mounts) exactly as before. When you push to `main`,
@@ -28,11 +29,15 @@ migrations ship automatically whenever a deploy happens.
 ```bash
 mkdir -p /opt/nfl-manager
 cd /opt/nfl-manager
-# copy docker-compose.prod.yml and .env.example from the repo here (scp or paste)
+# copy .env.example from the repo here (scp or paste) — docker-compose.prod.yml
+# gets synced automatically by the deploy workflow, no need to copy it by hand
 cp .env.example .env
 # edit .env: set POSTGRES_PASSWORD and JWT_SECRET_KEY to real random values
 # generate each with: openssl rand -hex 32
 ```
+
+Before the first deploy has run, `docker-compose.prod.yml` won't exist here
+yet — that's fine, the first deploy run creates it via the sync step.
 
 ### 2. Server: dedicated SSH key for CI
 
@@ -90,7 +95,7 @@ Repo → Settings → Secrets and variables → Actions → Variables tab:
 
 > **If the server only has a Tailscale IP (no public IP/port-forward):** the
 > app is only reachable to devices on your tailnet, same as SSH is right
-> now — `API_BASE_URL` should then be `http://100.78.45.17:8000`, and only
+> now — `API_BASE_URL` should then be `http://100.78.45.17:8002`, and only
 > people on your Tailscale network can play. That's fine for personal/private
 > use. If you want it reachable from the open internet later, that needs a
 > public IP or port-forward on the server (or Tailscale Funnel) in addition
@@ -117,7 +122,9 @@ docker compose -f docker-compose.prod.yml up -d
 ```
 
 The app is then reachable at `http://<server-ip>` (frontend, port 80) and
-`http://<server-ip>:8000` (API).
+`http://<server-ip>:8002` (API). The backend listens on 8000 *inside* its
+container, mapped to host port 8002 in `docker-compose.prod.yml` — plain
+8000 was already taken on the server by another service (Portainer).
 
 ## After setup
 
@@ -136,6 +143,6 @@ access needed.
 ## Later: adding a domain / HTTPS
 
 Once you point a domain at the server, put a reverse proxy (Caddy or nginx +
-certbot) in front of ports 80/8000 for TLS, and update the `API_BASE_URL`
+certbot) in front of ports 80/8002 for TLS, and update the `API_BASE_URL`
 GitHub Actions variable to the new `https://` URL, then push to `main` and
 redeploy to rebuild the frontend with the new API base.
