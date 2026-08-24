@@ -226,6 +226,10 @@ export async function claimTeam(nflTeamCode: string) {
   return data;
 }
 
+export async function releaseTeam() {
+  await apiClient.post("/teams/release");
+}
+
 export async function fetchMyTeam() {
   const { data } = await apiClient.get<Team>("/teams/me");
   return data;

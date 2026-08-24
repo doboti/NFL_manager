@@ -13,6 +13,7 @@ import {
   getStadiumUpgrade,
   getUpcomingMatch,
   listSponsors,
+  releaseTeam,
   setTeamTactic,
   signSponsor,
   startStadiumUpgrade,
@@ -211,6 +212,30 @@ export default function OverviewTab({ team, onTeamUpdate }: Props) {
                 </motion.button>
               </div>
             ))}
+      </div>
+
+      <div className="rounded-lg border border-red-900/40 bg-red-950/10 p-4">
+        <h2 className="mb-1 font-semibold text-red-400">Csapatváltás</h2>
+        <p className="mb-3 text-xs text-slate-500">
+          Feladod a(z) {team.name} irányítását -- egy AI veszi át azonnal --, és a Csapatválasztásnál egy másik,
+          jelenleg szabad csapatot választhatsz. A jelenlegi csapatod eddigi eredményei megmaradnak a
+          szezon-történetében.
+        </p>
+        <motion.button
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.96 }}
+          disabled={busy === "release"}
+          onClick={() =>
+            withBusy("release", async () => {
+              if (!confirm(`Biztosan feladod a(z) ${team.name} irányítását?`)) return;
+              await releaseTeam();
+              window.location.href = "/select-team";
+            })
+          }
+          className="rounded-lg border border-red-800 px-4 py-2 text-sm text-red-400 hover:bg-red-950/40 disabled:opacity-40"
+        >
+          {busy === "release" ? "..." : "Csapat feladása"}
+        </motion.button>
       </div>
     </div>
   );

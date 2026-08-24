@@ -1,6 +1,9 @@
+import uuid
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.models.player import Player
 from app.models.team import Team
 from app.models.user import User
@@ -63,3 +66,24 @@ def claim_team(db: Session, user: User, code: str, team_name: str) -> Team:
     db.flush()
     assign_real_roster(db, team, code)
     return team
+
+
+def release_team(db: Session, user: User) -> None:
+    """Hands the team back to an AI bot so the player can pick a different
+    one -- the mirror image of the takeover branch in claim_team above."""
+    team = db.query(Team).filter(Team.owner_id == user.id).first()
+    if team is None:
+        raise TeamClaimError("You don't have a team")
+
+    bot_user = User(
+        email=f"bot-{team.nfl_team_code.lower()}@bots.local",
+        hashed_password=hash_password(uuid.uuid4().hex),
+        display_name=f"{team.name} (AI)",
+        is_bot=True,
+    )
+    db.add(bot_user)
+    db.flush()
+
+    team.owner_id = bot_user.id
+    team.is_bot = True
+    db.flush()

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.game_data import NFL_TEAM_NAMES_BY_CODE, NFL_TEAMS
-from app.core.team_setup import TeamClaimError, avg_overall_by_team, claim_team as claim_team_core
+from app.core.team_setup import TeamClaimError, avg_overall_by_team, claim_team as claim_team_core, release_team as release_team_core
 from app.models.season_history import SeasonHistory
 from app.models.team import Team
 from app.models.user import User
@@ -113,6 +113,18 @@ def claim_team(
 
     db.refresh(team)
     return team
+
+
+@router.post("/release", status_code=status.HTTP_204_NO_CONTENT)
+def release_team(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Hands the player's current team to an AI bot so they can pick a
+    different one -- an AI immediately takes over so the league stays full."""
+    try:
+        release_team_core(db, current_user)
+        db.commit()
+    except TeamClaimError as e:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
 @router.put("/tactic", response_model=TeamOut)
