@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Achievement,
   DivisionStandings,
   ScheduledMatch,
   SeasonHistoryEntry,
@@ -8,6 +9,7 @@ import {
   Team,
   TeamRoster,
   fetchTeamRoster,
+  getAchievements,
   getLeagueSchedule,
   getSeasonHistory,
   getSeasonStatus,
@@ -49,18 +51,20 @@ export default function LeagueTab({ team }: Props) {
   const [standings, setStandings] = useState<DivisionStandings[] | null>(null);
   const [schedule, setSchedule] = useState<ScheduledMatch[] | null>(null);
   const [history, setHistory] = useState<SeasonHistoryEntry[] | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rosterModalOpen, setRosterModalOpen] = useState(false);
   const [rosterView, setRosterView] = useState<TeamRoster | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule(), getSeasonHistory()])
-      .then(([seasonData, standingsData, scheduleData, historyData]) => {
+    Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule(), getSeasonHistory(), getAchievements()])
+      .then(([seasonData, standingsData, scheduleData, historyData, achievementsData]) => {
         setSeason(seasonData);
         setStandings(standingsData);
         setSchedule(scheduleData);
         setHistory(historyData);
+        setAchievements(achievementsData);
       })
       .catch(() => setError("Nem sikerült betölteni a liga adatait."));
   }, []);
@@ -225,6 +229,34 @@ export default function LeagueTab({ team }: Props) {
                 ))}
               </tbody>
             </table>
+          </div>
+        </>
+      )}
+
+      {achievements !== null && (
+        <>
+          <h2 className="mb-3 mt-8 text-xl font-semibold">
+            Trófeák{" "}
+            <span className="text-sm font-normal text-slate-500">
+              ({achievements.filter((a) => a.earned).length}/{achievements.length})
+            </span>
+          </h2>
+          <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {achievements.map((a) => (
+              <div
+                key={a.code}
+                className={`rounded-lg border p-3 text-sm ${
+                  a.earned
+                    ? "border-gridiron-accent/60 bg-gridiron-accent/10 text-gridiron-accent"
+                    : "border-slate-800 bg-slate-900 text-slate-600"
+                }`}
+              >
+                <div className="font-semibold">{a.name}</div>
+                <div className={a.earned ? "text-xs text-slate-300" : "text-xs text-slate-600"}>
+                  {a.description}
+                </div>
+              </div>
+            ))}
           </div>
         </>
       )}

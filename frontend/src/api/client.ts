@@ -362,6 +362,18 @@ export async function getSeasonHistory() {
   return data;
 }
 
+export interface Achievement {
+  code: string;
+  name: string;
+  description: string;
+  earned: boolean;
+}
+
+export async function getAchievements() {
+  const { data } = await apiClient.get<Achievement[]>("/teams/me/achievements");
+  return data;
+}
+
 // --- starting lineup ---
 
 export async function getLineup() {

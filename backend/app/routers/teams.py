@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.achievements import compute_achievements
 from app.core.clock import get_or_create_league
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -11,6 +12,7 @@ from app.models.season_history import SeasonHistory
 from app.models.team import Team
 from app.models.user import User
 from app.schemas.team import (
+    AchievementOut,
     ClaimTeamRequest,
     NFLTeamOption,
     SeasonHistoryOut,
@@ -86,15 +88,21 @@ def get_my_team(current_user: User = Depends(get_current_user), db: Session = De
 
 @router.get("/me/history", response_model=list[SeasonHistoryOut])
 def get_my_season_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
-    if team is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No team yet")
+    """Every season this user personally managed, across any team they've
+    owned (release/re-claim included) -- a career record, not just the
+    currently-owned team's."""
     return (
         db.query(SeasonHistory)
-        .filter(SeasonHistory.team_id == team.id)
+        .filter(SeasonHistory.owner_id == current_user.id)
         .order_by(SeasonHistory.season.desc())
         .all()
     )
+
+
+@router.get("/me/achievements", response_model=list[AchievementOut])
+def get_my_achievements(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    history = db.query(SeasonHistory).filter(SeasonHistory.owner_id == current_user.id).all()
+    return compute_achievements(history)
 
 
 @router.get("/{team_id}/roster", response_model=TeamRosterOut)

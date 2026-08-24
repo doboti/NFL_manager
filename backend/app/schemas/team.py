@@ -67,3 +67,10 @@ class SeasonHistoryOut(BaseModel):
     losses: int
     ties: int
     playoff_result: str
+
+
+class AchievementOut(BaseModel):
+    code: str
+    name: str
+    description: str
+    earned: bool

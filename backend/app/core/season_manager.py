@@ -222,6 +222,7 @@ def _record_season_history(db: Session, league: League, champion_id: int) -> Non
             SeasonHistory(
                 league_id=league.id,
                 team_id=team.id,
+                owner_id=team.owner_id,
                 season=league.season,
                 wins=team.wins,
                 losses=team.losses,

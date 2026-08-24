@@ -15,6 +15,10 @@ class SeasonHistory(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     league_id: Mapped[int] = mapped_column(ForeignKey("leagues.id"), nullable=False, index=True)
     team_id: Mapped[int] = mapped_column(ForeignKey("teams.id"), nullable=False, index=True)
+    # Whoever owned the team when this season ended -- achievements are a
+    # manager's career record, not the team's, so this (not team_id alone)
+    # is what ties a result to a person across any team switches.
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     season: Mapped[int] = mapped_column(Integer, nullable=False)
 
     wins: Mapped[int] = mapped_column(Integer, nullable=False)
