@@ -55,3 +55,13 @@ class TeamRosterOut(BaseModel):
     name: str
     nfl_team_code: str | None
     players: list[PlayerOut] = []
+
+
+class SeasonHistoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    season: int
+    wins: int
+    losses: int
+    ties: int
+    playoff_result: str

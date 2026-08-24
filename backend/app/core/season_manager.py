@@ -18,7 +18,10 @@ from app.models.enums import SeasonPhase
 from app.models.league import League
 from app.models.match import Match
 from app.models.player import Player
+from app.models.season_history import SeasonHistory
 from app.models.team import Team
+
+_PLAYOFF_ROUND_ORDER = ["conference_semifinal", "conference_final", "super_bowl"]
 
 
 def _win_pct(team: Team) -> float:
@@ -83,6 +86,7 @@ def start_playoffs(db: Session, league: League, now: datetime) -> None:
         db.add(
             Match(
                 league_id=league.id,
+                season=league.season,
                 home_team_id=home.id,
                 away_team_id=away.id,
                 played=False,
@@ -126,6 +130,7 @@ def advance_playoffs(db: Session, league: League, now: datetime) -> dict | None:
                 db.add(
                     Match(
                         league_id=league.id,
+                        season=league.season,
                         home_team_id=group[0].id,
                         away_team_id=group[1].id,
                         played=False,
@@ -147,6 +152,7 @@ def advance_playoffs(db: Session, league: League, now: datetime) -> dict | None:
             db.add(
                 Match(
                     league_id=league.id,
+                    season=league.season,
                     home_team_id=finalists[0].id,
                     away_team_id=finalists[1].id,
                     played=False,
@@ -162,7 +168,7 @@ def advance_playoffs(db: Session, league: League, now: datetime) -> dict | None:
     if league.current_playoff_round == "super_bowl":
         champion = winners[winner_ids[0]]
         champion.franchise_capital += SUPER_BOWL_WINNER_BONUS
-        season_result = end_season(db, league, now)
+        season_result = end_season(db, league, now, champion.id)
         return {"event": "season_ended", "champion": champion.name, **season_result}
 
     return None
@@ -187,7 +193,45 @@ def apply_aging_and_draft(db: Session) -> dict:
     return {"aged": len(all_players), "retired": len(retired), "rookies_drafted": len(retired)}
 
 
-def end_season(db: Session, league: League, now: datetime) -> dict:
+def _record_season_history(db: Session, league: League, champion_id: int) -> None:
+    playoff_matches = (
+        db.query(Match)
+        .filter(Match.league_id == league.id, Match.season == league.season, Match.is_playoff.is_(True))
+        .all()
+    )
+    rounds_reached: dict[int, list[str]] = {}
+    for match in playoff_matches:
+        rounds_reached.setdefault(match.home_team_id, []).append(match.playoff_round)
+        rounds_reached.setdefault(match.away_team_id, []).append(match.playoff_round)
+
+    for team in db.query(Team).all():
+        if team.id == champion_id:
+            playoff_result = "champion"
+        else:
+            team_rounds = rounds_reached.get(team.id)
+            if not team_rounds:
+                playoff_result = "missed_playoffs"
+            else:
+                furthest = max(team_rounds, key=_PLAYOFF_ROUND_ORDER.index)
+                playoff_result = "runner_up" if furthest == "super_bowl" else furthest
+
+        db.add(
+            SeasonHistory(
+                league_id=league.id,
+                team_id=team.id,
+                season=league.season,
+                wins=team.wins,
+                losses=team.losses,
+                ties=team.ties,
+                playoff_result=playoff_result,
+            )
+        )
+    db.flush()
+
+
+def end_season(db: Session, league: League, now: datetime, champion_id: int) -> dict:
+    _record_season_history(db, league, champion_id)
+
     aging_result = apply_aging_and_draft(db)
 
     for team in db.query(Team).all():

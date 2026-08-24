@@ -3,14 +3,17 @@ from fastapi import APIRouter, Depends
 from app.core.clock import advance_time, get_offset_seconds, now_utc, reset_time
 from app.core.daily_cycle import run_daily_cycle
 from app.core.database import get_db
-from app.core.deps import require_admin
+from app.core.deps import get_current_user, require_admin
 from app.schemas.admin import AdvanceTimeRequest, AdvanceTimeResponse, TimeStatus
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 @router.get("/time", response_model=TimeStatus)
-def get_time(db=Depends(get_db), current_user=Depends(require_admin)):
+def get_time(db=Depends(get_db), current_user=Depends(get_current_user)):
+    """Read-only, so any logged-in user can call it -- the frontend needs the
+    current offset to render training/match countdowns correctly for
+    everyone, not just admins. Only *changing* the clock is admin-gated."""
     return TimeStatus(offset_seconds=get_offset_seconds(db), virtual_now=now_utc(db))
 
 

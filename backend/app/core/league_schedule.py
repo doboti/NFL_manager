@@ -71,6 +71,7 @@ def ensure_fixtures_scheduled(db: Session, league: League) -> int:
             db.add(
                 Match(
                     league_id=league.id,
+                    season=league.season,
                     home_team_id=home.id,
                     away_team_id=away.id,
                     played=False,

@@ -331,6 +331,19 @@ export async function getLeagueSchedule(limit = 30) {
   return data;
 }
 
+export interface SeasonHistoryEntry {
+  season: number;
+  wins: number;
+  losses: number;
+  ties: number;
+  playoff_result: string;
+}
+
+export async function getSeasonHistory() {
+  const { data } = await apiClient.get<SeasonHistoryEntry[]>("/teams/me/history");
+  return data;
+}
+
 // --- starting lineup ---
 
 export async function getLineup() {

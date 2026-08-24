@@ -3,9 +3,11 @@ import { motion } from "framer-motion";
 import {
   DivisionStandings,
   ScheduledMatch,
+  SeasonHistoryEntry,
   SeasonStatus,
   Team,
   getLeagueSchedule,
+  getSeasonHistory,
   getSeasonStatus,
   getStandings,
 } from "../../api/client";
@@ -19,6 +21,14 @@ const PLAYOFF_ROUND_LABELS: Record<string, string> = {
   conference_semifinal: "Konferencia elődöntő",
   conference_final: "Konferencia döntő",
   super_bowl: "Super Bowl",
+};
+
+const PLAYOFF_RESULT_LABELS: Record<string, string> = {
+  missed_playoffs: "Nem jutott rájátszásba",
+  conference_semifinal: "Konferencia elődöntő",
+  conference_final: "Konferencia döntő",
+  runner_up: "Super Bowl vesztes",
+  champion: "Bajnok",
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -36,14 +46,16 @@ export default function LeagueTab({ team }: Props) {
   const [season, setSeason] = useState<SeasonStatus | null>(null);
   const [standings, setStandings] = useState<DivisionStandings[] | null>(null);
   const [schedule, setSchedule] = useState<ScheduledMatch[] | null>(null);
+  const [history, setHistory] = useState<SeasonHistoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule()])
-      .then(([seasonData, standingsData, scheduleData]) => {
+    Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule(), getSeasonHistory()])
+      .then(([seasonData, standingsData, scheduleData, historyData]) => {
         setSeason(seasonData);
         setStandings(standingsData);
         setSchedule(scheduleData);
+        setHistory(historyData);
       })
       .catch(() => setError("Nem sikerült betölteni a liga adatait."));
   }, []);
@@ -158,6 +170,36 @@ export default function LeagueTab({ team }: Props) {
             );
           })}
         </div>
+      )}
+
+      {history !== null && history.length > 0 && (
+        <>
+          <h2 className="mb-3 mt-8 text-xl font-semibold">Korábbi szezonok</h2>
+          <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[10px] uppercase text-slate-600">
+                  <th className="p-3 font-medium">Szezon</th>
+                  <th className="p-3 font-medium">Mérleg</th>
+                  <th className="p-3 font-medium">Eredmény</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((h) => (
+                  <tr key={h.season} className="border-t border-slate-800 text-slate-300">
+                    <td className="p-3">{h.season}.</td>
+                    <td className="p-3">
+                      {h.wins}Gy {h.losses}V {h.ties}D
+                    </td>
+                    <td className={h.playoff_result === "champion" ? "p-3 font-bold text-gridiron-accent" : "p-3"}>
+                      {PLAYOFF_RESULT_LABELS[h.playoff_result] ?? h.playoff_result}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );

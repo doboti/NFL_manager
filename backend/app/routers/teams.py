@@ -6,11 +6,13 @@ from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.game_data import NFL_TEAM_NAMES_BY_CODE, NFL_TEAMS
 from app.core.team_setup import TeamClaimError, avg_overall_by_team, claim_team as claim_team_core
+from app.models.season_history import SeasonHistory
 from app.models.team import Team
 from app.models.user import User
 from app.schemas.team import (
     ClaimTeamRequest,
     NFLTeamOption,
+    SeasonHistoryOut,
     SetTacticRequest,
     TeamOut,
     TeamRosterOut,
@@ -61,6 +63,19 @@ def get_my_team(current_user: User = Depends(get_current_user), db: Session = De
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No team yet")
     return team
+
+
+@router.get("/me/history", response_model=list[SeasonHistoryOut])
+def get_my_season_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    if team is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No team yet")
+    return (
+        db.query(SeasonHistory)
+        .filter(SeasonHistory.team_id == team.id)
+        .order_by(SeasonHistory.season.desc())
+        .all()
+    )
 
 
 @router.get("/{team_id}/roster", response_model=TeamRosterOut)

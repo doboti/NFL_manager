@@ -7,6 +7,7 @@ from app.models.match import Match
 from app.models.training import TrainingSession
 from app.models.stadium_upgrade import StadiumUpgrade
 from app.models.trade_offer import TradeOffer
+from app.models.season_history import SeasonHistory
 
 __all__ = [
     "User",
@@ -18,4 +19,5 @@ __all__ = [
     "TrainingSession",
     "StadiumUpgrade",
     "TradeOffer",
+    "SeasonHistory",
 ]
