@@ -15,7 +15,7 @@ services:
     restart: unless-stopped
 
   backend:
-    image: ghcr.io/doboti/nfl-manager-backend:latest
+    image: ghcr.io/doboti/nfl-manager-backend:${IMAGE_TAG:-latest}
     environment:
       DATABASE_URL: postgresql+psycopg2://gridiron:${POSTGRES_PASSWORD}@db:5432/gridiron
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
@@ -27,7 +27,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ghcr.io/doboti/nfl-manager-frontend:latest
+    image: ghcr.io/doboti/nfl-manager-frontend:${IMAGE_TAG:-latest}
     ports:
       - "80:80"
     depends_on:

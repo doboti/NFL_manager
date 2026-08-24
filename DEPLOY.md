@@ -1,10 +1,25 @@
 # Deployment
 
-Push to `main` → GitHub Actions builds the backend and frontend Docker images,
-pushes them to GitHub Container Registry (GHCR), then SSHes into the server
-and runs `docker compose pull && up -d`. The backend container runs
-`alembic upgrade head` on every start, so DB migrations ship automatically
-with each deploy.
+Two separate GitHub Actions workflows:
+
+- **`.github/workflows/ci.yml`** — runs on every push to `main`. Builds the
+  backend and frontend Docker images and pushes them to GitHub Container
+  Registry (GHCR), tagged both `:latest` and `:<commit-sha>`. It never
+  touches the server.
+- **`.github/workflows/deploy-prod.yml`** — runs only when you trigger it by
+  hand (GitHub → Actions → "Deploy to production" → Run workflow). SSHes
+  into the server and runs `docker compose pull && up -d` for the image tag
+  you choose (defaults to `latest`, or type a specific commit SHA to pin/roll
+  back).
+
+So the day-to-day flow is: develop and test locally with `docker-compose.yml`
+(dev — hot reload, bind mounts) exactly as before. When you push to `main`,
+fresh images get built and sit in GHCR ready to go, but production is
+untouched. Once you're satisfied, go to the Actions tab and manually run
+"Deploy to production" — that's the only thing that ever changes the server.
+
+The backend container runs `alembic upgrade head` on every start, so DB
+migrations ship automatically whenever a deploy happens.
 
 ## One-time setup
 
@@ -31,9 +46,16 @@ Append `nfl_manager_deploy_key.pub` to `~/.ssh/authorized_keys` on the server
 for the user that will run the deploy (needs docker permissions). Keep
 `nfl_manager_deploy_key` (private half) for the GitHub secret below.
 
-### 3. GitHub repo settings → Secrets and variables → Actions
+### 3. GitHub repo: create the `production` environment
 
-**Secrets:**
+Repo → Settings → Environments → New environment → name it `production`.
+This is where the deploy workflow's secrets live, scoped so the build
+workflow (`ci.yml`) never sees them. Optionally tick "Required reviewers" and
+add yourself, so triggering the workflow still needs a manual approval click
+— an extra confirmation before anything reaches the server.
+
+Inside that environment, add **secrets**:
+
 | Name | Value |
 |---|---|
 | `SSH_HOST` | server's IP address |
@@ -41,24 +63,27 @@ for the user that will run the deploy (needs docker permissions). Keep
 | `SSH_PRIVATE_KEY` | contents of `nfl_manager_deploy_key` (private key) |
 | `DEPLOY_PATH` | `/opt/nfl-manager` |
 
-**Variables:**
+### 4. GitHub repo: repository variable (used by `ci.yml`, not environment-scoped)
+
+Repo → Settings → Secrets and variables → Actions → Variables tab:
+
 | Name | Value |
 |---|---|
 | `API_BASE_URL` | `http://<server-ip>:8000` — baked into the frontend build so the browser knows where the API is. Update this and re-push once you have a domain. |
 
-### 4. Make the GHCR images pullable from the server
+### 5. Make the GHCR images pullable from the server
 
-After the first push to `main` triggers a build, two packages appear under
+After the first push to `main` triggers `ci.yml`, two packages appear under
 the GitHub account: `nfl-manager-backend` and `nfl-manager-frontend`. New
 GHCR packages default to **private**, so the server needs access. Easiest
 path: open each package → Package settings → Change visibility → Public.
 (Alternative: `docker login ghcr.io` on the server with a personal access
 token that has `read:packages`.)
 
-### 5. First deploy
+### 6. First deploy
 
-Either push to `main` and let the Action do it, or run it manually once from
-`/opt/nfl-manager` on the server:
+Either trigger "Deploy to production" from the Actions tab, or run it
+manually once from `/opt/nfl-manager` on the server:
 
 ```bash
 docker compose -f docker-compose.prod.yml pull
@@ -70,18 +95,21 @@ The app is then reachable at `http://<server-ip>` (frontend, port 80) and
 
 ## After setup
 
-Every push to `main` redeploys automatically — no manual server steps needed.
+- Push to `main` → images build automatically, server untouched.
+- Happy with what you tested locally → Actions tab → "Deploy to production" →
+  Run workflow (leave `latest`, or type a specific SHA) → that build goes
+  live.
 
 ## Rollback
 
-Images are also tagged with the commit SHA (`ghcr.io/.../nfl-manager-backend:<sha>`).
-To roll back, SSH into the server, edit `docker-compose.prod.yml` to pin the
-`image:` lines to a known-good SHA instead of `:latest`, then
-`docker compose -f docker-compose.prod.yml up -d`.
+Images are also tagged with the commit SHA
+(`ghcr.io/.../nfl-manager-backend:<sha>`). To roll back, run "Deploy to
+production" again with that older SHA as the `image_tag` input — no server
+access needed.
 
 ## Later: adding a domain / HTTPS
 
 Once you point a domain at the server, put a reverse proxy (Caddy or nginx +
 certbot) in front of ports 80/8000 for TLS, and update the `API_BASE_URL`
-GitHub Actions variable to the new `https://` URL, then re-push to rebuild
-the frontend with the new API base.
+GitHub Actions variable to the new `https://` URL, then push to `main` and
+redeploy to rebuild the frontend with the new API base.
