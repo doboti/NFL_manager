@@ -22,6 +22,18 @@ def active_slot_count(db: Session, team_id: int) -> int:
     )
 
 
+def training_player_ids(db: Session, team_id: int, now) -> set[int]:
+    """Players currently mid-session (collected doesn't matter yet if the
+    clock hasn't reached ends_at) -- these can't be picked as a starter."""
+    rows = (
+        db.query(TrainingSession.player_id)
+        .join(Player, Player.id == TrainingSession.player_id)
+        .filter(Player.team_id == team_id, TrainingSession.collected.is_(False), TrainingSession.ends_at > now)
+        .all()
+    )
+    return {player_id for (player_id,) in rows}
+
+
 def start_training(db: Session, team_id: int, player_id: int) -> TrainingSession:
     player = db.query(Player).filter(Player.id == player_id, Player.team_id == team_id).first()
     if player is None:

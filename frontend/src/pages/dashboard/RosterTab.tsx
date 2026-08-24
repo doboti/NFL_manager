@@ -29,7 +29,7 @@ function slotLabel(position: string, index?: number): string {
   return position;
 }
 
-function LineupPicker({ team, onTeamUpdate }: Props) {
+function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { trainingPlayerIds: Set<number> }) {
   const [qbId, setQbId] = useState<number | null>(null);
   const [rbIds, setRbIds] = useState<(number | null)[]>([null, null]);
   const [wrIds, setWrIds] = useState<(number | null)[]>([null, null]);
@@ -41,7 +41,7 @@ function LineupPicker({ team, onTeamUpdate }: Props) {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const starters = team.players.filter((p) => p.is_starter);
+    const starters = team.players.filter((p) => p.is_starter && !trainingPlayerIds.has(p.id));
     setQbId(starters.find((p) => p.position === "QB")?.id ?? null);
     const rbs = starters.filter((p) => p.position === "RB");
     setRbIds([rbs[0]?.id ?? null, rbs[1]?.id ?? null]);
@@ -50,15 +50,17 @@ function LineupPicker({ team, onTeamUpdate }: Props) {
     setTeId(starters.find((p) => p.position === "TE")?.id ?? null);
     setDefId(starters.find((p) => p.position === "DEF")?.id ?? null);
     setKId(starters.find((p) => p.position === "K")?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team.players]);
 
+  const selectable = team.players.filter((p) => !trainingPlayerIds.has(p.id));
   const byPosition: Record<string, Player[]> = {
-    QB: team.players.filter((p) => p.position === "QB"),
-    RB: team.players.filter((p) => p.position === "RB"),
-    WR: team.players.filter((p) => p.position === "WR"),
-    TE: team.players.filter((p) => p.position === "TE"),
-    DEF: team.players.filter((p) => p.position === "DEF"),
-    K: team.players.filter((p) => p.position === "K"),
+    QB: selectable.filter((p) => p.position === "QB"),
+    RB: selectable.filter((p) => p.position === "RB"),
+    WR: selectable.filter((p) => p.position === "WR"),
+    TE: selectable.filter((p) => p.position === "TE"),
+    DEF: selectable.filter((p) => p.position === "DEF"),
+    K: selectable.filter((p) => p.position === "K"),
   };
 
   const slots: { position: string; index?: number; value: number | null; onChange: (v: number | null) => void }[] = [
@@ -99,7 +101,8 @@ function LineupPicker({ team, onTeamUpdate }: Props) {
       <h2 className="mb-1 text-lg font-semibold">Kezdőcsapat</h2>
       <p className="mb-3 text-xs text-slate-500">
         Válaszd ki, ki induljon a következő meccsen. Amit nem állítasz be, azt a rendszer automatikusan a
-        legjobb OVR-ű játékossal tölti fel.
+        legjobb OVR-ű játékossal tölti fel. Az épp edzésben lévő játékosok nem választhatók, amíg az edzésük
+        véget nem ér.
       </p>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -178,12 +181,15 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
   }
 
   const trainingByPlayer = new Map(training.map((t) => [t.player_id, t]));
+  const trainingPlayerIds = new Set(
+    training.filter((t) => !t.collected && new Date(t.ends_at).getTime() > virtualNow()).map((t) => t.player_id)
+  );
 
   return (
     <div>
       {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
-      <LineupPicker team={team} onTeamUpdate={onTeamUpdate} />
+      <LineupPicker team={team} onTeamUpdate={onTeamUpdate} trainingPlayerIds={trainingPlayerIds} />
 
       <h2 className="mb-4 text-xl font-semibold">Keret · Edzésslotok: {training.length}/3</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" style={{ perspective: 1000 }}>

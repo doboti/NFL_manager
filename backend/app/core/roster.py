@@ -1,6 +1,8 @@
 from sqlalchemy.orm import Session
 
+from app.core.clock import now_utc
 from app.core.game_data import player_market_value
+from app.core.training import training_player_ids
 from app.models.enums import Position
 from app.models.player import Player
 from app.models.team import Team
@@ -116,12 +118,16 @@ def set_starting_lineup(
     players = db.query(Player).filter(Player.id.in_(ids), Player.team_id == team.id).all()
     players_by_id = {p.id: p for p in players}
 
+    training_ids = training_player_ids(db, team.id, now_utc(db))
+
     for pid, expected_position in required:
         player = players_by_id.get(pid)
         if player is None:
             raise RosterError("Player not found on this team")
         if player.position != expected_position:
             raise RosterError(f"{player.first_name} {player.last_name} is not a {expected_position.value}")
+        if pid in training_ids:
+            raise RosterError(f"{player.first_name} {player.last_name} is currently training and can't start")
 
     for player in team.players:
         player.is_starter = player.id in players_by_id
