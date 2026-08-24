@@ -127,14 +127,14 @@ export default function SelectTeam() {
 
                 {teamsError && <p className="text-sm text-red-400">{teamsError}</p>}
 
-                <div className="grid max-h-72 grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
+                <div className="grid max-h-80 grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4">
                   {teams.map((t) => (
                     <button
                       key={t.code}
                       type="button"
                       disabled={t.taken}
                       onClick={() => setSelectedCode(t.code)}
-                      className={`rounded-lg border px-2 py-2 text-left text-xs transition ${
+                      className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-3 text-center text-xs transition ${
                         t.taken
                           ? "cursor-not-allowed border-slate-800 bg-slate-900 text-slate-600"
                           : selectedCode === t.code
@@ -142,10 +142,21 @@ export default function SelectTeam() {
                           : "border-slate-700 bg-slate-800 text-slate-300 hover:border-gridiron-accent"
                       }`}
                     >
-                      <div className="font-semibold">{t.code}</div>
-                      <div className="truncate">{t.taken ? "Foglalt" : t.name}</div>
+                      {t.logo_url ? (
+                        <img
+                          src={t.logo_url}
+                          alt={t.name}
+                          className={`h-12 w-12 object-contain ${t.taken ? "opacity-30 grayscale" : ""}`}
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="h-12 w-12" />
+                      )}
+                      <div className="truncate font-semibold leading-tight">{t.taken ? "Foglalt" : t.name}</div>
                       {!t.taken && t.controlled_by_bot && (
-                        <div className="mt-0.5 text-[10px] text-gridiron-cyan">AI vezényli · átveheted</div>
+                        <div className="text-[10px] text-gridiron-cyan">AI vezényli · átveheted</div>
                       )}
                     </button>
                   ))}

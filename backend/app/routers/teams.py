@@ -6,7 +6,7 @@ from app.core.achievements import compute_achievements
 from app.core.clock import get_or_create_league
 from app.core.database import get_db
 from app.core.deps import get_current_user
-from app.core.game_data import LEAGUES
+from app.core.game_data import LEAGUES, team_logo_url
 from app.core.team_setup import TeamClaimError, avg_overall_by_team, claim_team as claim_team_core, release_team as release_team_core
 from app.models.season_history import SeasonHistory
 from app.models.team import Team
@@ -43,6 +43,7 @@ def list_available_teams(league_key: str, db: Session = Depends(get_db)):
             name=t["name"],
             taken=t["code"] in teams_by_code and not teams_by_code[t["code"]].is_bot,
             controlled_by_bot=t["code"] in teams_by_code and teams_by_code[t["code"]].is_bot,
+            logo_url=team_logo_url(league_key, t["code"]),
         )
         for t in LEAGUES[league_key]["teams"]
     ]

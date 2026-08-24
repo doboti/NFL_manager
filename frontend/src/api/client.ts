@@ -108,6 +108,7 @@ export interface NFLTeamOption {
   name: string;
   taken: boolean;
   controlled_by_bot: boolean;
+  logo_url: string | null;
 }
 
 export interface TrainingSession {

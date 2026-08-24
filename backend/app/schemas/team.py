@@ -33,6 +33,7 @@ class NFLTeamOption(BaseModel):
     name: str
     taken: bool
     controlled_by_bot: bool = False
+    logo_url: str | None = None
 
 
 class ClaimTeamRequest(BaseModel):

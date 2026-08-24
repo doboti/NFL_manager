@@ -90,6 +90,17 @@ COLLEGE_TEAMS = [
 COLLEGE_TEAM_NAMES_BY_CODE = {t["code"]: t["name"] for t in COLLEGE_TEAMS}
 COLLEGE_TEAM_ESPN_ID_BY_CODE = {t["code"]: t["espn_id"] for t in COLLEGE_TEAMS}
 
+
+def team_logo_url(league_key: str, code: str) -> str | None:
+    """ESPN's team logo CDN uses a predictable path -- no need to fetch or
+    store anything, just build the URL from data we already have."""
+    if league_key == "nfl":
+        return f"https://a.espncdn.com/i/teamlogos/nfl/500/{code.lower()}.png"
+    if league_key == "college":
+        espn_id = COLLEGE_TEAM_ESPN_ID_BY_CODE.get(code)
+        return f"https://a.espncdn.com/i/teamlogos/ncaa/500/{espn_id}.png" if espn_id else None
+    return None
+
 COLLEGE_DIVISIONS = {
     "National South": ["CF-ALA", "CF-UGA", "CF-AUB", "CF-TENN"],
     "National West": ["CF-LSU", "CF-FLA", "CF-TAM", "CF-MISS"],
