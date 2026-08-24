@@ -46,7 +46,23 @@ Append `nfl_manager_deploy_key.pub` to `~/.ssh/authorized_keys` on the server
 for the user that will run the deploy (needs docker permissions). Keep
 `nfl_manager_deploy_key` (private half) for the GitHub secret below.
 
-### 3. GitHub repo: create the `production` environment
+### 3. Tailscale auth key (only if the server is behind Tailscale)
+
+If `SSH_HOST` is a Tailscale IP (`100.x.x.x`) rather than a public IP, the
+GitHub Actions runner — which lives on the public internet — can't reach it
+directly. The deploy workflow first joins your tailnet as a temporary,
+throwaway node (`tailscale/github-action`), then the SSH step can reach the
+server over Tailscale exactly like your own machine does.
+
+Generate a key at the
+[Tailscale admin console](https://login.tailscale.com/admin/settings/keys) →
+Generate auth key. A **reusable, ephemeral** key is the right choice here —
+ephemeral so the throwaway CI node deregisters itself after each run instead
+of piling up in your tailnet's device list, reusable so the same key works
+for every deploy rather than a one-shot key you'd have to regenerate each
+time. Save the generated key for the secret below (it's only shown once).
+
+### 4. GitHub repo: create the `production` environment
 
 Repo → Settings → Environments → New environment → name it `production`.
 This is where the deploy workflow's secrets live, scoped so the build
@@ -58,20 +74,30 @@ Inside that environment, add **secrets**:
 
 | Name | Value |
 |---|---|
-| `SSH_HOST` | server's IP address |
+| `SSH_HOST` | server's Tailscale (or public) IP address |
 | `SSH_USER` | the SSH user from step 2 |
 | `SSH_PRIVATE_KEY` | contents of `nfl_manager_deploy_key` (private key) |
 | `DEPLOY_PATH` | `/opt/nfl-manager` |
+| `TAILSCALE_AUTHKEY` | the key from step 3 — skip if the server has a public IP instead |
 
-### 4. GitHub repo: repository variable (used by `ci.yml`, not environment-scoped)
+### 5. GitHub repo: repository variable (used by `ci.yml`, not environment-scoped)
 
 Repo → Settings → Secrets and variables → Actions → Variables tab:
 
 | Name | Value |
 |---|---|
-| `API_BASE_URL` | `http://<server-ip>:8000` — baked into the frontend build so the browser knows where the API is. Update this and re-push once you have a domain. |
+| `API_BASE_URL` | the address *players' browsers* will use to reach the API — see the Tailscale note below before picking this. Update this and re-push once you have a domain. |
 
-### 5. Make the GHCR images pullable from the server
+> **If the server only has a Tailscale IP (no public IP/port-forward):** the
+> app is only reachable to devices on your tailnet, same as SSH is right
+> now — `API_BASE_URL` should then be `http://100.78.45.17:8000`, and only
+> people on your Tailscale network can play. That's fine for personal/private
+> use. If you want it reachable from the open internet later, that needs a
+> public IP or port-forward on the server (or Tailscale Funnel) in addition
+> to what this doc sets up — the Tailscale step above only gets the *deploy*
+> traffic in, not player traffic.
+
+### 6. Make the GHCR images pullable from the server
 
 After the first push to `main` triggers `ci.yml`, two packages appear under
 the GitHub account: `nfl-manager-backend` and `nfl-manager-frontend`. New
@@ -80,7 +106,7 @@ path: open each package → Package settings → Change visibility → Public.
 (Alternative: `docker login ghcr.io` on the server with a personal access
 token that has `read:packages`.)
 
-### 6. First deploy
+### 7. First deploy
 
 Either trigger "Deploy to production" from the Actions tab, or run it
 manually once from `/opt/nfl-manager` on the server:
