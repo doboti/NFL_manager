@@ -21,6 +21,9 @@ class TeamOut(BaseModel):
     created_at: datetime
     next_match_at: datetime
     daily_salary_cost: int
+    primary_color: str
+    secondary_color: str
+    logo_url: str | None
     players: list[PlayerOut] = []
 
 

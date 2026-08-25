@@ -101,6 +101,96 @@ def team_logo_url(league_key: str, code: str) -> str | None:
         return f"https://a.espncdn.com/i/teamlogos/ncaa/500/{espn_id}.png" if espn_id else None
     return None
 
+
+# Curated real team/school brand colors (primary, secondary), used to theme
+# the dashboard once a manager claims that team -- hand-picked rather than
+# extracted from the logo images at runtime for reliability.
+DEFAULT_TEAM_COLORS = {"primary": "#34d399", "secondary": "#22d3ee"}  # gridiron-accent fallback
+
+TEAM_COLORS: dict[str, dict[str, str]] = {
+    # NFL
+    "ARI": {"primary": "#97233F", "secondary": "#000000"},
+    "ATL": {"primary": "#A71930", "secondary": "#000000"},
+    "BAL": {"primary": "#241773", "secondary": "#9E7C0C"},
+    "BUF": {"primary": "#00338D", "secondary": "#C60C30"},
+    "CAR": {"primary": "#0085CA", "secondary": "#101820"},
+    "CHI": {"primary": "#0B162A", "secondary": "#C83803"},
+    "CIN": {"primary": "#FB4F14", "secondary": "#000000"},
+    "CLE": {"primary": "#311D00", "secondary": "#FF3C00"},
+    "DAL": {"primary": "#003594", "secondary": "#869397"},
+    "DEN": {"primary": "#FB4F14", "secondary": "#002244"},
+    "DET": {"primary": "#0076B6", "secondary": "#B0B7BC"},
+    "GB": {"primary": "#203731", "secondary": "#FFB612"},
+    "HOU": {"primary": "#03202F", "secondary": "#A71930"},
+    "IND": {"primary": "#002C5F", "secondary": "#A2AAAD"},
+    "JAX": {"primary": "#101820", "secondary": "#D7A22A"},
+    "KC": {"primary": "#E31837", "secondary": "#FFB81C"},
+    "LAC": {"primary": "#0080C6", "secondary": "#FFC20E"},
+    "LAR": {"primary": "#003594", "secondary": "#FFA300"},
+    "LV": {"primary": "#000000", "secondary": "#A5ACAF"},
+    "MIA": {"primary": "#008E97", "secondary": "#FC4C02"},
+    "MIN": {"primary": "#4F2683", "secondary": "#FFC62F"},
+    "NE": {"primary": "#002244", "secondary": "#C60C30"},
+    "NO": {"primary": "#D3BC8D", "secondary": "#101820"},
+    "NYG": {"primary": "#0B2265", "secondary": "#A71930"},
+    "NYJ": {"primary": "#125740", "secondary": "#000000"},
+    "PHI": {"primary": "#004C54", "secondary": "#A5ACAF"},
+    "PIT": {"primary": "#FFB612", "secondary": "#101820"},
+    "SEA": {"primary": "#002244", "secondary": "#69BE28"},
+    "SF": {"primary": "#AA0000", "secondary": "#B3995D"},
+    "TB": {"primary": "#D50A0A", "secondary": "#34302B"},
+    "TEN": {"primary": "#0C2340", "secondary": "#4B92DB"},
+    "WSH": {"primary": "#5A1414", "secondary": "#FFB612"},
+    # College
+    "CF-ALA": {"primary": "#9E1B32", "secondary": "#828A8F"},
+    "CF-UGA": {"primary": "#BA0C2F", "secondary": "#000000"},
+    "CF-AUB": {"primary": "#0C2340", "secondary": "#E87722"},
+    "CF-TENN": {"primary": "#FF8200", "secondary": "#58595B"},
+    "CF-LSU": {"primary": "#461D7C", "secondary": "#FDD023"},
+    "CF-FLA": {"primary": "#0021A5", "secondary": "#FA4616"},
+    "CF-TAM": {"primary": "#500000", "secondary": "#8E8C84"},
+    "CF-MISS": {"primary": "#14213D", "secondary": "#CE1126"},
+    "CF-TEX": {"primary": "#BF5700", "secondary": "#333F48"},
+    "CF-OU": {"primary": "#841617", "secondary": "#EAAA00"},
+    "CF-OKST": {"primary": "#FF7300", "secondary": "#000000"},
+    "CF-BAY": {"primary": "#154734", "secondary": "#FFB81C"},
+    "CF-TCU": {"primary": "#4D1979", "secondary": "#A3A9AC"},
+    "CF-KSU": {"primary": "#512888", "secondary": "#A7A8AA"},
+    "CF-UTAH": {"primary": "#CC0000", "secondary": "#000000"},
+    "CF-ND": {"primary": "#0C2340", "secondary": "#AE9142"},
+    "CF-OSU": {"primary": "#BB0000", "secondary": "#666666"},
+    "CF-MICH": {"primary": "#00274C", "secondary": "#FFCB05"},
+    "CF-MSU": {"primary": "#18453B", "secondary": "#B0B0B0"},
+    "CF-PSU": {"primary": "#041E42", "secondary": "#B0B0B0"},
+    "CF-WIS": {"primary": "#C5050C", "secondary": "#000000"},
+    "CF-IOWA": {"primary": "#FFCD00", "secondary": "#000000"},
+    "CF-NEB": {"primary": "#E41C38", "secondary": "#000000"},
+    "CF-USC": {"primary": "#990000", "secondary": "#FFC72C"},
+    "CF-ORE": {"primary": "#154733", "secondary": "#FEE123"},
+    "CF-UCLA": {"primary": "#2D68C4", "secondary": "#F2A900"},
+    "CF-WASH": {"primary": "#4B2E83", "secondary": "#B7A57A"},
+    "CF-CLEM": {"primary": "#F56600", "secondary": "#522D80"},
+    "CF-FSU": {"primary": "#782F40", "secondary": "#CEB888"},
+    "CF-MIA": {"primary": "#F47321", "secondary": "#005030"},
+    "CF-UNC": {"primary": "#7BAFD4", "secondary": "#13294B"},
+    "CF-VT": {"primary": "#630031", "secondary": "#CF4420"},
+}
+
+
+def team_colors(code: str | None) -> dict[str, str]:
+    if code is None:
+        return DEFAULT_TEAM_COLORS
+    return TEAM_COLORS.get(code, DEFAULT_TEAM_COLORS)
+
+
+def team_logo_url_by_code(code: str | None) -> str | None:
+    """Infers the league from the code's prefix (college codes are always
+    "CF-"-prefixed) so a bare team code is enough to build the logo URL --
+    no need to look up the team's league via a relationship or extra query."""
+    if code is None:
+        return None
+    return team_logo_url("college", code) if code.startswith("CF-") else team_logo_url("nfl", code)
+
 COLLEGE_DIVISIONS = {
     "National South": ["CF-ALA", "CF-UGA", "CF-AUB", "CF-TENN"],
     "National West": ["CF-LSU", "CF-FLA", "CF-TAM", "CF-MISS"],
