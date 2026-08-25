@@ -203,6 +203,12 @@ docker compose exec backend python -m app.scripts.import_college_players
 # lefut, ez a manuális újra-seedeléshez kell, pl. reset után ha a backend nem indult újra)
 docker compose exec backend python -m app.scripts.seed_bot_teams
 
+# Javítófuttatás: rosztert ad minden olyan meglévő csapatnak (bot vagy ember), amelynek
+# jelenleg 0 játékosa van -- ez akkor fordulhat elő, ha a backend első indítása (ami
+# automatikusan létrehozza a bot-csapatokat) megelőzte a fenti import szkriptek lefutását.
+# Csak az üres csapatokat érinti, semmit nem töröl -- élő szerveren is biztonságos.
+docker compose exec backend python -m app.scripts.backfill_missing_rosters
+
 # Töröl minden felhasználót, csapatot és a hozzájuk tartozó adatot (edzés, szponzor,
 # stadion-fejlesztés, meccs, csereajánlat), majd újra feltölti a ligát AI-botokkal.
 # A valódi importált játékosok megmaradnak, csak visszakerülnek a szabadügynök-piacra.

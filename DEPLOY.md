@@ -129,6 +129,35 @@ The app is then reachable at `http://<server-ip>` (frontend, port 80) and
 container, mapped to host port 8002 in `docker-compose.prod.yml` — plain
 8000 was already taken on the server by another service (Portainer).
 
+**Immediately after this first `up -d`, before anyone registers/plays**, run
+the player import scripts:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend python -m app.scripts.import_nfl_players
+docker compose -f docker-compose.prod.yml exec backend python -m app.scripts.import_college_players
+```
+
+This matters because the backend seeds every AI bot team **on its very
+first startup**, and team creation only pulls real players from whatever's
+already been imported — it never retroactively backfills a team that
+missed out. Start the server before importing, and every bot team (and any
+human team claimed before the import finishes) is permanently stuck with
+an empty roster, because nothing re-checks an already-created team later.
+
+If this was already missed and teams are showing up empty, it's still
+fixable without losing any accounts/progress:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend python -m app.scripts.import_nfl_players
+docker compose -f docker-compose.prod.yml exec backend python -m app.scripts.import_college_players
+docker compose -f docker-compose.prod.yml exec backend python -m app.scripts.backfill_missing_rosters
+```
+
+`backfill_missing_rosters` only touches teams that currently have zero
+players — it never deletes or reassigns anything from a team that already
+has a roster, so it's safe to run any time, including on a server with real
+registered users.
+
 ## After setup
 
 - Push to `main` → images build automatically, server untouched.
