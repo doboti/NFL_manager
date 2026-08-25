@@ -34,6 +34,7 @@ export interface Player {
   listed_for_transfer: boolean;
   asking_price: number | null;
   is_starter: boolean;
+  injured_until: string | null;
 }
 
 export interface Team {
@@ -49,6 +50,9 @@ export interface Team {
   created_at: string;
   next_match_at: string;
   daily_salary_cost: number;
+  primary_color: string;
+  secondary_color: string;
+  logo_url: string | null;
   players: Player[];
 }
 
@@ -218,6 +222,32 @@ export async function fetchCurrentUser() {
   return data;
 }
 
+export interface SlotInfo {
+  slot: number;
+  required_level: number;
+}
+
+export interface Profile {
+  id: number;
+  email: string;
+  display_name: string;
+  level: number;
+  completed_seasons: number;
+  unlocked_slots: number;
+  total_slots: number;
+  next_slot: SlotInfo | null;
+  achievements: Achievement[];
+}
+
+export async function fetchProfile() {
+  const { data } = await apiClient.get<Profile>("/auth/profile");
+  return data;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  await apiClient.put("/auth/password", { current_password: currentPassword, new_password: newPassword });
+}
+
 export interface LeagueOption {
   key: string;
   name: string;
@@ -347,6 +377,24 @@ export async function getSeasonStatus() {
 
 export async function getLeagueSchedule(limit = 30) {
   const { data } = await apiClient.get<ScheduledMatch[]>("/league/schedule", { params: { limit } });
+  return data;
+}
+
+export interface PlayoffMatch {
+  id: number;
+  playoff_round: string;
+  home_team_id: number;
+  away_team_id: number;
+  home_team_name: string;
+  away_team_name: string;
+  home_score: number | null;
+  away_score: number | null;
+  played: boolean;
+  scheduled_at: string;
+}
+
+export async function getPlayoffBracket() {
+  const { data } = await apiClient.get<PlayoffMatch[]>("/league/playoffs");
   return data;
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { ArrowLeftRight } from "lucide-react";
 import {
   Player,
   Team,
@@ -16,6 +16,7 @@ import {
 } from "../../api/client";
 import PlayerAvatar from "../../components/PlayerAvatar";
 import { SkeletonBlock } from "../../components/Skeleton";
+import { Card, PrimaryButton, SecondaryButton } from "../../components/ui";
 
 interface Props {
   team: Team;
@@ -45,7 +46,7 @@ function OfferRow({
   onCancel: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm">
+    <Card className="text-sm">
       <div className="mb-2 flex items-center justify-between">
         <span className="font-semibold">
           {isIncoming ? offer.from_team_name : offer.to_team_name}
@@ -84,33 +85,21 @@ function OfferRow({
         <div className="mt-3 flex gap-2">
           {isIncoming ? (
             <>
-              <button
-                disabled={busy}
-                onClick={onAccept}
-                className="rounded-lg bg-gridiron-accent px-3 py-1 text-xs font-semibold text-slate-950 disabled:opacity-40"
-              >
+              <PrimaryButton disabled={busy} onClick={onAccept} className="px-3 py-1 text-xs">
                 Elfogadás
-              </button>
-              <button
-                disabled={busy}
-                onClick={onReject}
-                className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 disabled:opacity-40"
-              >
+              </PrimaryButton>
+              <SecondaryButton disabled={busy} onClick={onReject} className="px-3 py-1 text-xs">
                 Elutasítás
-              </button>
+              </SecondaryButton>
             </>
           ) : (
-            <button
-              disabled={busy}
-              onClick={onCancel}
-              className="rounded-lg border border-slate-700 px-3 py-1 text-xs text-slate-300 disabled:opacity-40"
-            >
+            <SecondaryButton disabled={busy} onClick={onCancel} className="px-3 py-1 text-xs">
               Visszavonás
-            </button>
+            </SecondaryButton>
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -180,17 +169,12 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
       </p>
 
       <div className="mb-6">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => setShowForm((v) => !v)}
-          className="rounded-lg bg-gridiron-accent px-4 py-2 text-sm font-semibold text-slate-950"
-        >
+        <PrimaryButton onClick={() => setShowForm((v) => !v)}>
           {showForm ? "Mégse" : "Új ajánlat"}
-        </motion.button>
+        </PrimaryButton>
 
         {showForm && (
-          <div className="mt-4 space-y-3 rounded-lg border border-slate-800 bg-slate-900 p-4">
+          <Card className="mt-4 space-y-3">
             <div>
               <label className="mb-1 block text-xs text-slate-400">Csapat</label>
               <select
@@ -199,7 +183,7 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
                   setSelectedTeamId(e.target.value ? Number(e.target.value) : null);
                   setTargetPlayerId(null);
                 }}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-gridiron-accent"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
               >
                 <option value="">Válassz csapatot...</option>
                 {otherTeams.map((t) => (
@@ -217,7 +201,7 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
                 <select
                   value={targetPlayerId ?? ""}
                   onChange={(e) => setTargetPlayerId(e.target.value ? Number(e.target.value) : null)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-gridiron-accent"
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
                 >
                   <option value="">Válassz játékost...</option>
                   {targetRoster.map((p) => (
@@ -234,7 +218,7 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
               <select
                 value={offeredPlayerId ?? ""}
                 onChange={(e) => setOfferedPlayerId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-gridiron-accent"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
               >
                 <option value="">Nincs</option>
                 {team.players.map((p) => (
@@ -252,13 +236,11 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
                 min={0}
                 value={cashOffer}
                 onChange={(e) => setCashOffer(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-gridiron-accent"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
               />
             </div>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
+            <PrimaryButton
               disabled={!selectedTeamId || !targetPlayerId || busy === "create-offer"}
               onClick={() =>
                 withBusy("create-offer", async () => {
@@ -268,15 +250,17 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
                   await refresh();
                 })
               }
-              className="w-full rounded-lg bg-gridiron-accent py-2 text-sm font-semibold text-slate-950 disabled:opacity-40"
+              className="w-full"
             >
               Ajánlat küldése
-            </motion.button>
-          </div>
+            </PrimaryButton>
+          </Card>
         )}
       </div>
 
-      <h2 className="mb-3 text-lg font-semibold">Bejövő ajánlatok</h2>
+      <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+        <ArrowLeftRight size={16} className="text-team-text" /> Bejövő ajánlatok
+      </h2>
       <div className="mb-6 space-y-2">
         {offers === null && (
           <>

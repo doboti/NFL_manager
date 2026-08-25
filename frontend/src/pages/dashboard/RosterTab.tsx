@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { Users } from "lucide-react";
 import {
   Player,
   Team,
@@ -16,6 +17,7 @@ import {
 import PlayerCard from "../../components/PlayerCard";
 import { SkeletonCardGrid } from "../../components/Skeleton";
 import CountdownText from "../../components/CountdownText";
+import { Card, PrimaryButton, SectionHeading } from "../../components/ui";
 import { useVirtualTime } from "../../context/TimeContext";
 
 interface Props {
@@ -29,7 +31,12 @@ function slotLabel(position: string, index?: number): string {
   return position;
 }
 
-function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { trainingPlayerIds: Set<number> }) {
+function LineupPicker({
+  team,
+  onTeamUpdate,
+  trainingPlayerIds,
+  injuredPlayerIds,
+}: Props & { trainingPlayerIds: Set<number>; injuredPlayerIds: Set<number> }) {
   const [qbId, setQbId] = useState<number | null>(null);
   const [rbIds, setRbIds] = useState<(number | null)[]>([null, null]);
   const [wrIds, setWrIds] = useState<(number | null)[]>([null, null]);
@@ -41,7 +48,9 @@ function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { train
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const starters = team.players.filter((p) => p.is_starter && !trainingPlayerIds.has(p.id));
+    const starters = team.players.filter(
+      (p) => p.is_starter && !trainingPlayerIds.has(p.id) && !injuredPlayerIds.has(p.id)
+    );
     setQbId(starters.find((p) => p.position === "QB")?.id ?? null);
     const rbs = starters.filter((p) => p.position === "RB");
     setRbIds([rbs[0]?.id ?? null, rbs[1]?.id ?? null]);
@@ -53,7 +62,7 @@ function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { train
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [team.players]);
 
-  const selectable = team.players.filter((p) => !trainingPlayerIds.has(p.id));
+  const selectable = team.players.filter((p) => !trainingPlayerIds.has(p.id) && !injuredPlayerIds.has(p.id));
   const byPosition: Record<string, Player[]> = {
     QB: selectable.filter((p) => p.position === "QB"),
     RB: selectable.filter((p) => p.position === "RB"),
@@ -96,12 +105,12 @@ function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { train
   }
 
   return (
-    <div className="mb-8 rounded-lg border border-slate-800 bg-slate-900 p-4">
+    <Card className="mb-8">
       <h2 className="mb-1 text-lg font-semibold">Kezdőcsapat</h2>
       <p className="mb-3 text-xs text-slate-500">
         Válaszd ki, ki induljon a következő meccsen. Amit nem állítasz be, azt a rendszer automatikusan a
-        legjobb OVR-ű játékossal tölti fel. Az épp edzésben lévő játékosok nem választhatók, amíg az edzésük
-        véget nem ér.
+        legjobb OVR-ű játékossal tölti fel. Az épp edzésben lévő vagy sérült játékosok nem választhatók,
+        amíg fel nem épülnek.
       </p>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
@@ -113,7 +122,7 @@ function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { train
             <select
               value={slot.value ?? ""}
               onChange={(e) => slot.onChange(e.target.value ? Number(e.target.value) : null)}
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs outline-none focus:border-gridiron-accent"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs outline-none focus:border-team-primary"
             >
               <option value="">Automatikus (legjobb OVR)</option>
               {byPosition[slot.position].map((p) => (
@@ -131,16 +140,10 @@ function LineupPicker({ team, onTeamUpdate, trainingPlayerIds }: Props & { train
       )}
       {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
 
-      <motion.button
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.97 }}
-        disabled={hasDuplicates || busy}
-        onClick={handleSave}
-        className="mt-3 rounded-lg bg-gridiron-accent px-4 py-1.5 text-sm font-semibold text-slate-950 disabled:opacity-40"
-      >
+      <PrimaryButton disabled={hasDuplicates || busy} onClick={handleSave} className="mt-3">
         {saved ? "Mentve!" : busy ? "Mentés..." : "Felállás mentése"}
-      </motion.button>
-    </div>
+      </PrimaryButton>
+    </Card>
   );
 }
 
@@ -173,7 +176,7 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
   if (training === null) {
     return (
       <div>
-        <h2 className="mb-4 text-xl font-semibold">Keret</h2>
+        <SectionHeading icon={Users}>Keret</SectionHeading>
         <SkeletonCardGrid count={8} />
       </div>
     );
@@ -183,18 +186,27 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
   const trainingPlayerIds = new Set(
     training.filter((t) => !t.collected && new Date(t.ends_at).getTime() > virtualNow()).map((t) => t.player_id)
   );
+  const injuredPlayerIds = new Set(
+    team.players.filter((p) => p.injured_until && new Date(p.injured_until).getTime() > virtualNow()).map((p) => p.id)
+  );
 
   return (
     <div>
       {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
-      <LineupPicker team={team} onTeamUpdate={onTeamUpdate} trainingPlayerIds={trainingPlayerIds} />
+      <LineupPicker
+        team={team}
+        onTeamUpdate={onTeamUpdate}
+        trainingPlayerIds={trainingPlayerIds}
+        injuredPlayerIds={injuredPlayerIds}
+      />
 
-      <h2 className="mb-4 text-xl font-semibold">Keret · Edzésslotok: {training.length}/3</h2>
+      <SectionHeading icon={Users}>Keret · Edzésslotok: {training.length}/3</SectionHeading>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" style={{ perspective: 1000 }}>
         {team.players.map((player, i) => {
           const session = trainingByPlayer.get(player.id);
           const ready = session && new Date(session.ends_at).getTime() <= virtualNow();
+          const isInjured = injuredPlayerIds.has(player.id);
           const xpPct = Math.min(100, (player.xp / player.xp_to_next_level) * 100);
           const isListing = listingPlayerId === player.id;
 
@@ -208,6 +220,11 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                   {player.is_starter && (
                     <div className="mb-1 inline-block rounded bg-black/30 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">
                       Kezdő
+                    </div>
+                  )}
+                  {isInjured && (
+                    <div className="mb-1 ml-1 inline-block rounded bg-red-950/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-300">
+                      Sérült
                     </div>
                   )}
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/20">
@@ -225,7 +242,12 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
               }
               footer={
                 <div className="space-y-1.5">
-                  {!session && (
+                  {isInjured && (
+                    <p className="rounded-lg bg-red-950/40 py-1.5 text-center text-xs font-medium text-red-300">
+                      Sérült · felépül: <CountdownText target={player.injured_until as string} />
+                    </p>
+                  )}
+                  {!session && !isInjured && (
                     <motion.button
                       whileHover={{ scale: 1.02 }}
                       whileTap={{ scale: 0.96 }}
@@ -247,9 +269,7 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                     </p>
                   )}
                   {session && ready && (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.96 }}
+                    <PrimaryButton
                       animate={{ opacity: [0.6, 1] }}
                       transition={{ opacity: { duration: 1, repeat: Infinity, repeatType: "reverse" } }}
                       disabled={busy === `collect-${player.id}`}
@@ -260,10 +280,10 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                           setTraining(await listTraining());
                         })
                       }
-                      className="w-full rounded-lg bg-gridiron-accent py-1.5 text-xs font-semibold text-slate-950"
+                      className="w-full py-1.5 text-xs"
                     >
                       XP begyűjtése
-                    </motion.button>
+                    </PrimaryButton>
                   )}
 
                   <div className="flex gap-1.5">

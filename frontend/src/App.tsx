@@ -9,6 +9,7 @@ import Register from "./pages/Register";
 import SelectTeam from "./pages/SelectTeam";
 import Dashboard from "./pages/Dashboard";
 import AdminPage from "./pages/AdminPage";
+import ProfilePage from "./pages/ProfilePage";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { token } = useAuth();
@@ -36,7 +37,7 @@ function useTeamStatus(): TeamStatus {
 function RequireTeam({ children }: { children: JSX.Element }) {
   const status = useTeamStatus();
   if (status === "loading") return <SkeletonDashboard />;
-  if (status === "no-team") return <Navigate to="/select-team" replace />;
+  if (status === "no-team") return <Navigate to="/profile" replace />;
   return children;
 }
 
@@ -95,6 +96,16 @@ export default function App() {
               <RequireAdmin>
                 <AdminPage />
               </RequireAdmin>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <RedirectAdminAway>
+                <ProfilePage />
+              </RedirectAdminAway>
             </RequireAuth>
           }
         />

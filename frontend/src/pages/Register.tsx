@@ -21,7 +21,7 @@ export default function Register() {
     try {
       const token = await register(email, password, displayName);
       setToken(token);
-      navigate("/select-team");
+      navigate("/profile");
     } catch {
       setError("Nem sikerült létrehozni a fiókot. Lehet, hogy ez az e-mail már foglalt.");
     } finally {

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { CalendarDays, Swords } from "lucide-react";
 import { Match, PracticeMatchResult, Team, listMatches, playPracticeMatch } from "../../api/client";
 import MatchViewer from "../../components/MatchViewer";
 import { SkeletonBlock } from "../../components/Skeleton";
+import { Card, PrimaryButton, SectionHeading } from "../../components/ui";
 
 interface Props {
   team: Team;
@@ -43,17 +45,14 @@ export default function MatchesTab({ team }: Props) {
     <div>
       {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
-      <h2 className="mb-3 text-xl font-semibold">Gyakorló meccs</h2>
-      <div className="mb-8 rounded-lg border border-slate-800 bg-slate-900 p-4">
-        <motion.button
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.96 }}
+      <SectionHeading icon={Swords}>Gyakorló meccs</SectionHeading>
+      <Card className="mb-8">
+        <PrimaryButton
           disabled={busy === "practice"}
           onClick={() => withBusy("practice", async () => setPracticeResult(await playPracticeMatch()))}
-          className="rounded-lg bg-gridiron-accent px-4 py-2 text-sm font-semibold text-slate-950 disabled:opacity-40"
         >
           {busy === "practice" ? "Szimuláció..." : "Gyakorló meccs indítása"}
-        </motion.button>
+        </PrimaryButton>
 
         <AnimatePresence>
           {practiceResult && (
@@ -74,9 +73,9 @@ export default function MatchesTab({ team }: Props) {
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
+      </Card>
 
-      <h2 className="mb-3 text-xl font-semibold">Meccs történet</h2>
+      <SectionHeading icon={CalendarDays}>Meccs történet</SectionHeading>
       {matches === null ? (
         <div className="space-y-2">
           {[0, 1, 2].map((i) => (
@@ -90,7 +89,7 @@ export default function MatchesTab({ team }: Props) {
           {matches.map((m) => {
             const expanded = expandedMatchId === m.id;
             return (
-              <div key={m.id} className="rounded-lg border border-slate-800 bg-slate-900 p-3 text-sm text-slate-300">
+              <Card key={m.id} className="p-3 text-sm text-slate-300">
                 <button
                   className="flex w-full items-center justify-between text-left"
                   onClick={() => setExpandedMatchId(expanded ? null : m.id)}
@@ -127,7 +126,7 @@ export default function MatchesTab({ team }: Props) {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </div>
+              </Card>
             );
           })}
         </div>

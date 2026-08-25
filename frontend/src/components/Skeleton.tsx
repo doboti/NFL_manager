@@ -31,20 +31,20 @@ export function SkeletonBlock({ className = "" }: { className?: string }) {
 
 export function SkeletonDashboard() {
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
+    <div className="flex min-h-screen bg-slate-950">
+      <div className="hidden w-64 shrink-0 flex-col gap-2 border-r border-slate-800/80 p-4 lg:flex">
+        <SkeletonBlock className="mb-4 h-10 w-full" />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <SkeletonBlock key={i} className="h-9 w-full" />
+        ))}
+      </div>
+      <div className="mx-auto w-full max-w-5xl px-4 py-10 lg:px-8">
+        <div className="mb-6">
           <SkeletonBlock className="h-8 w-56" />
           <SkeletonBlock className="mt-2 h-4 w-72" />
         </div>
-        <SkeletonBlock className="h-9 w-28" />
+        <SkeletonCardGrid count={6} />
       </div>
-      <div className="mb-8 flex gap-2">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <SkeletonBlock key={i} className="h-8 w-24" />
-        ))}
-      </div>
-      <SkeletonCardGrid count={6} />
     </div>
   );
 }

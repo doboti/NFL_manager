@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import {
   Player,
   Team,
@@ -10,6 +9,8 @@ import {
 } from "../../api/client";
 import PlayerCard from "../../components/PlayerCard";
 import { SkeletonCardGrid } from "../../components/Skeleton";
+import { PrimaryButton } from "../../components/ui";
+import { useTeamTheme } from "../../context/TeamThemeContext";
 
 const MARKET_POSITIONS = ["", "QB", "RB", "WR", "TE", "K", "DEF"];
 const PAGE_SIZE = 30;
@@ -38,20 +39,15 @@ function PriceButton({
         {priceLabel ?? ""}
         {price.toLocaleString("hu-HU")} FT
       </div>
-      <motion.button
-        whileHover={{ scale: 1.03 }}
-        whileTap={{ scale: 0.96 }}
-        disabled={disabled || busy}
-        onClick={onBuy}
-        className="w-full rounded-lg bg-slate-950/80 py-1.5 text-xs font-semibold text-white hover:bg-slate-950 disabled:opacity-40"
-      >
+      <PrimaryButton disabled={disabled || busy} onClick={onBuy} className="w-full py-1.5 text-xs">
         Vásárlás
-      </motion.button>
+      </PrimaryButton>
     </>
   );
 }
 
 export default function MarketTab({ team, onTeamUpdate }: Props) {
+  const { contrastOnPrimary } = useTeamTheme();
   const [subTab, setSubTab] = useState<"free-agents" | "transfers">("free-agents");
 
   const [market, setMarket] = useState<Player[] | null>(null);
@@ -116,16 +112,22 @@ export default function MarketTab({ team, onTeamUpdate }: Props) {
       <div className="mb-4 flex gap-2">
         <button
           onClick={() => setSubTab("free-agents")}
-          className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-            subTab === "free-agents" ? "bg-gridiron-accent text-slate-950" : "border border-slate-700 text-slate-300"
+          style={subTab === "free-agents" ? { color: contrastOnPrimary } : undefined}
+          className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+            subTab === "free-agents"
+              ? "bg-team-primary"
+              : "border border-slate-700 text-slate-300 hover:border-team-primary/60"
           }`}
         >
           Szabadügynökök
         </button>
         <button
           onClick={() => setSubTab("transfers")}
-          className={`rounded-lg px-3 py-1.5 text-sm font-semibold ${
-            subTab === "transfers" ? "bg-gridiron-accent text-slate-950" : "border border-slate-700 text-slate-300"
+          style={subTab === "transfers" ? { color: contrastOnPrimary } : undefined}
+          className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
+            subTab === "transfers"
+              ? "bg-team-primary"
+              : "border border-slate-700 text-slate-300 hover:border-team-primary/60"
           }`}
         >
           Transzferpiac ({transferList?.length ?? 0})

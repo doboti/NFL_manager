@@ -9,6 +9,13 @@ export default {
           accent: "#34d399",
           cyan: "#22d3ee",
         },
+        team: {
+          primary: "rgb(var(--team-primary-rgb) / <alpha-value>)",
+          secondary: "rgb(var(--team-secondary-rgb) / <alpha-value>)",
+          // Always-legible-on-dark-background variant for text/icons --
+          // see readableAccentHex() in teamTheme.ts.
+          text: "rgb(var(--team-text-rgb) / <alpha-value>)",
+        },
       },
       keyframes: {
         shimmer: {

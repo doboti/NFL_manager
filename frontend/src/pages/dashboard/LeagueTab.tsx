@@ -1,21 +1,24 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  Achievement,
   DivisionStandings,
+  PlayoffMatch,
   ScheduledMatch,
   SeasonHistoryEntry,
   SeasonStatus,
   Team,
   TeamRoster,
   fetchTeamRoster,
-  getAchievements,
   getLeagueSchedule,
+  getPlayoffBracket,
   getSeasonHistory,
   getSeasonStatus,
   getStandings,
 } from "../../api/client";
+import { CalendarClock, History, Trophy } from "lucide-react";
+import { Card, SectionHeading } from "../../components/ui";
 import { SkeletonBlock } from "../../components/Skeleton";
+import { useVirtualTime } from "../../context/TimeContext";
 
 interface Props {
   team: Team;
@@ -40,6 +43,8 @@ const PHASE_LABELS: Record<string, string> = {
   PLAYOFFS: "Rájátszás",
 };
 
+const PLAYOFF_ROUND_ORDER = ["conference_semifinal", "conference_final", "super_bowl"];
+
 function winPct(t: { wins: number; losses: number; ties: number }): number {
   const games = t.wins + t.losses + t.ties;
   if (games === 0) return 0;
@@ -51,20 +56,21 @@ export default function LeagueTab({ team }: Props) {
   const [standings, setStandings] = useState<DivisionStandings[] | null>(null);
   const [schedule, setSchedule] = useState<ScheduledMatch[] | null>(null);
   const [history, setHistory] = useState<SeasonHistoryEntry[] | null>(null);
-  const [achievements, setAchievements] = useState<Achievement[] | null>(null);
+  const [playoffs, setPlayoffs] = useState<PlayoffMatch[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rosterModalOpen, setRosterModalOpen] = useState(false);
   const [rosterView, setRosterView] = useState<TeamRoster | null>(null);
   const [rosterError, setRosterError] = useState<string | null>(null);
+  const { virtualNow } = useVirtualTime();
 
   useEffect(() => {
-    Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule(), getSeasonHistory(), getAchievements()])
-      .then(([seasonData, standingsData, scheduleData, historyData, achievementsData]) => {
+    Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule(), getSeasonHistory(), getPlayoffBracket()])
+      .then(([seasonData, standingsData, scheduleData, historyData, playoffData]) => {
         setSeason(seasonData);
         setStandings(standingsData);
         setSchedule(scheduleData);
         setHistory(historyData);
-        setAchievements(achievementsData);
+        setPlayoffs(playoffData);
       })
       .catch(() => setError("Nem sikerült betölteni a liga adatait."));
   }, []);
@@ -93,7 +99,7 @@ export default function LeagueTab({ team }: Props) {
       {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
       {season && (
-        <div className="mb-6 rounded-lg border border-slate-800 bg-slate-900 p-4">
+        <Card className="mb-6">
           <h2 className="mb-1 font-semibold">
             {season.season}. szezon · {PHASE_LABELS[season.phase]}
           </h2>
@@ -104,10 +110,55 @@ export default function LeagueTab({ team }: Props) {
               ? PLAYOFF_ROUND_LABELS[season.current_playoff_round] ?? season.current_playoff_round
               : ""}
           </p>
-        </div>
+        </Card>
       )}
 
-      <h2 className="mb-3 text-xl font-semibold">Állás</h2>
+      {playoffs !== null && playoffs.length > 0 && (
+        <>
+          <SectionHeading icon={Trophy}>Rájátszás</SectionHeading>
+          <div className="mb-8 grid gap-4 md:grid-cols-3">
+            {PLAYOFF_ROUND_ORDER.filter((round) => playoffs.some((m) => m.playoff_round === round)).map((round) => (
+              <div key={round}>
+                <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-slate-400">
+                  {PLAYOFF_ROUND_LABELS[round] ?? round}
+                </h3>
+                <div className="space-y-2">
+                  {playoffs
+                    .filter((m) => m.playoff_round === round)
+                    .map((m) => {
+                      const mine = m.home_team_id === team.id || m.away_team_id === team.id;
+                      const homeWon = m.played && (m.home_score ?? 0) > (m.away_score ?? 0);
+                      const awayWon = m.played && (m.away_score ?? 0) > (m.home_score ?? 0);
+                      return (
+                        <Card key={m.id} highlight={mine} className="text-sm">
+                          <div className={`flex items-center justify-between ${homeWon ? "font-bold text-team-text" : "text-slate-300"}`}>
+                            <button onClick={() => openRoster(m.home_team_id)} className="truncate text-left hover:underline">
+                              {m.home_team_name}
+                            </button>
+                            {m.played && <span>{m.home_score}</span>}
+                          </div>
+                          <div className={`mt-1 flex items-center justify-between ${awayWon ? "font-bold text-team-text" : "text-slate-300"}`}>
+                            <button onClick={() => openRoster(m.away_team_id)} className="truncate text-left hover:underline">
+                              {m.away_team_name}
+                            </button>
+                            {m.played && <span>{m.away_score}</span>}
+                          </div>
+                          {!m.played && (
+                            <div className="mt-1 text-right text-[10px] text-slate-500">
+                              {new Date(m.scheduled_at).toLocaleString("hu-HU")}
+                            </div>
+                          )}
+                        </Card>
+                      );
+                    })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <SectionHeading>Állás</SectionHeading>
       {standings === null ? (
         <div className="mb-8 space-y-2">
           <SkeletonBlock className="h-40 w-full" />
@@ -121,7 +172,7 @@ export default function LeagueTab({ team }: Props) {
                 {standings
                   .filter((d) => d.conference === conference)
                   .map((division) => (
-                    <div key={division.division} className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+                    <Card key={division.division} className="p-3">
                       <div className="mb-2 text-xs font-semibold text-slate-500">{division.division}</div>
                       <table className="w-full text-sm">
                         <thead>
@@ -139,7 +190,7 @@ export default function LeagueTab({ team }: Props) {
                             .map((t) => (
                               <tr
                                 key={t.id}
-                                className={t.id === team.id ? "font-bold text-gridiron-accent" : "text-slate-300"}
+                                className={t.id === team.id ? "font-bold text-team-text" : "text-slate-300"}
                               >
                                 <td className="py-0.5 truncate">
                                   <button
@@ -158,7 +209,7 @@ export default function LeagueTab({ team }: Props) {
                             ))}
                         </tbody>
                       </table>
-                    </div>
+                    </Card>
                   ))}
               </div>
             </div>
@@ -166,7 +217,7 @@ export default function LeagueTab({ team }: Props) {
         </div>
       )}
 
-      <h2 className="mb-3 text-xl font-semibold">Sorsolás</h2>
+      <SectionHeading icon={CalendarClock}>Sorsolás</SectionHeading>
       {schedule === null ? (
         <div className="space-y-2">
           <SkeletonBlock className="h-10 w-full" />
@@ -185,7 +236,7 @@ export default function LeagueTab({ team }: Props) {
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: Math.min(i, 15) * 0.03 }}
                 className={`flex items-center justify-between rounded-lg border p-3 text-sm ${
-                  mine ? "border-gridiron-accent bg-gridiron-accent/10 text-gridiron-accent" : "border-slate-800 bg-slate-900 text-slate-300"
+                  mine ? "border-team-primary bg-team-primary/10 text-team-text" : "border-slate-800 bg-slate-900 text-slate-300"
                 }`}
               >
                 <span>
@@ -205,8 +256,8 @@ export default function LeagueTab({ team }: Props) {
 
       {history !== null && history.length > 0 && (
         <>
-          <h2 className="mb-3 mt-8 text-xl font-semibold">Korábbi szezonok</h2>
-          <div className="overflow-x-auto rounded-lg border border-slate-800 bg-slate-900">
+          <SectionHeading icon={History} className="mt-8">Korábbi szezonok</SectionHeading>
+          <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-slate-900/70">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[10px] uppercase text-slate-600">
@@ -222,41 +273,13 @@ export default function LeagueTab({ team }: Props) {
                     <td className="p-3">
                       {h.wins}Gy {h.losses}V {h.ties}D
                     </td>
-                    <td className={h.playoff_result === "champion" ? "p-3 font-bold text-gridiron-accent" : "p-3"}>
+                    <td className={h.playoff_result === "champion" ? "p-3 font-bold text-team-text" : "p-3"}>
                       {PLAYOFF_RESULT_LABELS[h.playoff_result] ?? h.playoff_result}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        </>
-      )}
-
-      {achievements !== null && (
-        <>
-          <h2 className="mb-3 mt-8 text-xl font-semibold">
-            Trófeák{" "}
-            <span className="text-sm font-normal text-slate-500">
-              ({achievements.filter((a) => a.earned).length}/{achievements.length})
-            </span>
-          </h2>
-          <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {achievements.map((a) => (
-              <div
-                key={a.code}
-                className={`rounded-lg border p-3 text-sm ${
-                  a.earned
-                    ? "border-gridiron-accent/60 bg-gridiron-accent/10 text-gridiron-accent"
-                    : "border-slate-800 bg-slate-900 text-slate-600"
-                }`}
-              >
-                <div className="font-semibold">{a.name}</div>
-                <div className={a.earned ? "text-xs text-slate-300" : "text-xs text-slate-600"}>
-                  {a.description}
-                </div>
-              </div>
-            ))}
           </div>
         </>
       )}
@@ -275,7 +298,7 @@ export default function LeagueTab({ team }: Props) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
               onClick={(e) => e.stopPropagation()}
-              className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-lg border border-slate-800 bg-slate-900 p-4"
+              className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl border border-slate-800 bg-slate-900 p-4"
             >
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-lg font-semibold">{rosterView?.name ?? "Roster"}</h3>
@@ -313,6 +336,9 @@ export default function LeagueTab({ team }: Props) {
                             {p.first_name} {p.last_name}
                             {p.is_starter && (
                               <span className="ml-1 text-[10px] text-gridiron-accent">kezdő</span>
+                            )}
+                            {p.injured_until && new Date(p.injured_until).getTime() > virtualNow() && (
+                              <span className="ml-1 text-[10px] text-red-400">sérült</span>
                             )}
                           </td>
                           <td className="py-1 text-slate-500">{p.position}</td>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface PlayerAvatarProps {
   firstName: string;
@@ -9,6 +9,10 @@ interface PlayerAvatarProps {
 
 export default function PlayerAvatar({ firstName, lastName, photoUrl, size = 48 }: PlayerAvatarProps) {
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [photoUrl]);
   const initials = `${firstName[0] ?? ""}${lastName[0] ?? ""}`.toUpperCase();
 
   if (photoUrl && !failed) {
