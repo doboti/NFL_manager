@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now_utc
 from app.core.game_data import player_market_value
+from app.core.injuries import injured_player_ids
 from app.core.training import training_player_ids
 from app.models.enums import Position
 from app.models.player import Player
@@ -129,7 +130,10 @@ def set_starting_lineup(
     for p in roster_players:
         by_position.setdefault(p.position, []).append(p)
 
-    training_ids = training_player_ids(db, team.id, now_utc(db))
+    now = now_utc(db)
+    training_ids = training_player_ids(db, team.id, now)
+    injured_ids = injured_player_ids(db, team.id, now)
+    unavailable_ids = training_ids | injured_ids
 
     used_ids: set[int] = set()
     for pid, expected_position in slots:
@@ -142,13 +146,15 @@ def set_starting_lineup(
             raise RosterError(f"{player.first_name} {player.last_name} is not a {expected_position.value}")
         if pid in training_ids:
             raise RosterError(f"{player.first_name} {player.last_name} is currently training and can't start")
+        if pid in injured_ids:
+            raise RosterError(f"{player.first_name} {player.last_name} is injured and can't start")
         used_ids.add(pid)
 
     for pid, expected_position in slots:
         if pid is not None:
             continue
         candidates = [
-            p for p in by_position.get(expected_position, []) if p.id not in used_ids and p.id not in training_ids
+            p for p in by_position.get(expected_position, []) if p.id not in used_ids and p.id not in unavailable_ids
         ]
         if not candidates:
             raise RosterError(f"No available {expected_position.value} player to auto-fill that slot")

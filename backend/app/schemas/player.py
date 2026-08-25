@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import Position
@@ -21,3 +23,4 @@ class PlayerOut(BaseModel):
     listed_for_transfer: bool
     asking_price: int | None
     is_starter: bool
+    injured_until: datetime | None

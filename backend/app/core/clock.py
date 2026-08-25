@@ -14,6 +14,7 @@ from app.core.game_data import LEAGUES
 from app.models.game_clock import GameClock
 from app.models.league import League
 from app.models.match import Match
+from app.models.player import Player
 from app.models.sponsor import Sponsor
 from app.models.stadium_upgrade import StadiumUpgrade
 from app.models.training import TrainingSession
@@ -93,6 +94,9 @@ def reset_time(db: Session) -> datetime:
             {TrainingSession.ends_at: TrainingSession.ends_at - delta}, synchronize_session=False
         )
         db.query(Sponsor).update({Sponsor.expires_at: Sponsor.expires_at - delta}, synchronize_session=False)
+        db.query(Player).filter(Player.injured_until.isnot(None)).update(
+            {Player.injured_until: Player.injured_until - delta}, synchronize_session=False
+        )
 
     db.commit()
     return now_utc(db)

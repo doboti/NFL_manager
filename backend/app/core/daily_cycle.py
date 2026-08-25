@@ -3,10 +3,11 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.bots import apply_bot_progression, resolve_bot_trade_offers
 from app.core.clock import list_leagues, now_utc
 from app.core.economy import apply_player_salaries, apply_sponsor_payouts, apply_stadium_revenue
+from app.core.injuries import maybe_injure_player
 from app.core.league_schedule import ensure_fixtures_scheduled
 from app.core.market import refill_market
 from app.core.season_manager import advance_playoffs, advance_regular_season_day
-from app.core.simulation import simulate_match
+from app.core.simulation import select_starting_lineup, simulate_match
 from app.models.enums import SeasonPhase
 from app.models.match import Match
 from app.models.team import Team
@@ -36,7 +37,17 @@ def run_daily_cycle(db: Session) -> dict:
         home = match.home_team
         away = match.away_team
 
-        result = simulate_match(home.name, away.name, home.players, away.players, home.tactic, away.tactic)
+        home_available = [p for p in home.players if not (p.injured_until and p.injured_until > now)]
+        away_available = [p for p in away.players if not (p.injured_until and p.injured_until > now)]
+
+        result = simulate_match(home.name, away.name, home_available, away_available, home.tactic, away.tactic)
+
+        home_lineup = select_starting_lineup(home_available)
+        away_lineup = select_starting_lineup(away_available)
+        home_in_play = [p for players in home_lineup.values() for p in players]
+        away_in_play = [p for players in away_lineup.values() for p in players]
+        maybe_injure_player(home_in_play, now)
+        maybe_injure_player(away_in_play, now)
 
         match.home_tactic = home.tactic
         match.away_tactic = away.tactic
