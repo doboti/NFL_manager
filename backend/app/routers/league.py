@@ -9,7 +9,14 @@ from app.models.league import League
 from app.models.match import Match
 from app.models.team import Team
 from app.models.user import User
-from app.schemas.league import DivisionStandings, LeagueOption, ScheduledMatch, SeasonStatus, TeamStanding
+from app.schemas.league import (
+    DivisionStandings,
+    LeagueOption,
+    PlayoffMatchOut,
+    ScheduledMatch,
+    SeasonStatus,
+    TeamStanding,
+)
 
 router = APIRouter(prefix="/league", tags=["league"])
 
@@ -81,6 +88,18 @@ def get_schedule(
         .filter(Match.played.is_(False), Team.league_id == league.id)
         .order_by(Match.scheduled_at.asc())
         .limit(limit)
+        .all()
+    )
+
+
+@router.get("/playoffs", response_model=list[PlayoffMatchOut])
+def get_playoff_bracket(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    league = _current_users_league(current_user, db)
+    return (
+        db.query(Match)
+        .options(joinedload(Match.home_team), joinedload(Match.away_team))
+        .filter(Match.league_id == league.id, Match.season == league.season, Match.is_playoff.is_(True))
+        .order_by(Match.scheduled_at.asc())
         .all()
     )
 

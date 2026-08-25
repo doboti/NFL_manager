@@ -46,3 +46,18 @@ class ScheduledMatch(BaseModel):
 class LeagueOption(BaseModel):
     key: str
     name: str
+
+
+class PlayoffMatchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    playoff_round: str
+    home_team_id: int
+    away_team_id: int
+    home_team_name: str
+    away_team_name: str
+    home_score: int | None
+    away_score: int | None
+    played: bool
+    scheduled_at: datetime
