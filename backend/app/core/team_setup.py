@@ -102,13 +102,7 @@ def claim_team(db: Session, user: User, league: League, code: str, team_name: st
     return team
 
 
-def release_team(db: Session, user: User) -> None:
-    """Hands the team back to an AI bot so the player can pick a different
-    one -- the mirror image of the takeover branch in claim_team above."""
-    team = db.query(Team).filter(Team.owner_id == user.id).first()
-    if team is None:
-        raise TeamClaimError("You don't have a team")
-
+def _release_team_to_bot(db: Session, team: Team) -> None:
     bot_user = User(
         email=f"bot-{team.nfl_team_code.lower()}@bots.local",
         hashed_password=hash_password(uuid.uuid4().hex),
@@ -121,3 +115,25 @@ def release_team(db: Session, user: User) -> None:
     team.owner_id = bot_user.id
     team.is_bot = True
     db.flush()
+
+
+def release_team(db: Session, user: User) -> None:
+    """Hands the team back to an AI bot so the player can pick a different
+    one -- the mirror image of the takeover branch in claim_team above."""
+    team = db.query(Team).filter(Team.owner_id == user.id).first()
+    if team is None:
+        raise TeamClaimError("You don't have a team")
+
+    _release_team_to_bot(db, team)
+
+
+def release_all_human_teams(db: Session, league: League) -> int:
+    """Called once a league's season is fully over: a manager's tenure with
+    a team lasts exactly one season -- once it ends, the team goes back to
+    AI control and the manager's slot frees up to claim a team again (same
+    league or a different one) for the next season. Achievements/level are
+    unaffected since SeasonHistory is owner-scoped, not team-scoped."""
+    teams = db.query(Team).filter(Team.league_id == league.id, Team.is_bot.is_(False)).all()
+    for team in teams:
+        _release_team_to_bot(db, team)
+    return len(teams)

@@ -10,12 +10,15 @@ from app.core.game_data import (
     REGULAR_SEASON_DAYS,
     SUPER_BOWL_WINNER_BONUS,
 )
+from app.core.config import settings
 from app.core.schedule import LEAGUE_TZ
+from app.core.team_setup import release_all_human_teams
 from app.models.enums import SeasonPhase
 from app.models.league import League
 from app.models.match import Match
 from app.models.player import Player
 from app.models.season_history import SeasonHistory
+from app.models.stadium_upgrade import StadiumUpgrade
 from app.models.team import Team
 
 _PLAYOFF_ROUND_ORDER = ["conference_semifinal", "conference_final", "super_bowl"]
@@ -196,6 +199,23 @@ def reset_player_ratings(db: Session, league: League) -> dict:
     return {"aged": len(all_players), "ratings_reset": len(all_players)}
 
 
+def reset_team_economy(db: Session, league: League) -> int:
+    """Every team (bot or human) starts each new season with the same clean
+    slate -- capital and stadium level both revert to their defaults, and
+    any in-progress upgrade is dropped since it may target a level that no
+    longer exists post-reset. Mirrors reset_player_ratings' per-season wipe
+    philosophy, just for the economic side instead of the roster side."""
+    teams = db.query(Team).filter(Team.league_id == league.id).all()
+    team_ids = [t.id for t in teams]
+    if team_ids:
+        db.query(StadiumUpgrade).filter(StadiumUpgrade.team_id.in_(team_ids)).delete(synchronize_session=False)
+    for team in teams:
+        team.franchise_capital = settings.starting_capital
+        team.stadium_level = 1
+    db.flush()
+    return len(teams)
+
+
 def _record_season_history(db: Session, league: League, champion_id: int) -> None:
     playoff_matches = (
         db.query(Match)
@@ -236,7 +256,13 @@ def _record_season_history(db: Session, league: League, champion_id: int) -> Non
 def end_season(db: Session, league: League, now: datetime, champion_id: int) -> dict:
     _record_season_history(db, league, champion_id)
 
+    # A manager's tenure with a team lasts exactly one season; once it's
+    # over everyone goes back to AI control so the freed-up slot can be
+    # claimed again (same league or a different one) for the next one.
+    released_managers = release_all_human_teams(db, league)
+
     aging_result = reset_player_ratings(db, league)
+    reset_team_economy(db, league)
 
     for team in db.query(Team).filter(Team.league_id == league.id).all():
         team.wins = 0
@@ -250,4 +276,4 @@ def end_season(db: Session, league: League, now: datetime, champion_id: int) -> 
     league.season_started_at = now
 
     db.flush()
-    return {"new_season": league.season, **aging_result}
+    return {"new_season": league.season, "released_managers": released_managers, **aging_result}
