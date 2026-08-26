@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from sqlalchemy import case
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
@@ -12,6 +13,17 @@ from app.schemas.player import PlayerOut
 from app.schemas.team import TeamOut
 
 router = APIRouter(prefix="/market", tags=["market"])
+
+# A pure OVR-descending default made every visit to the market look like a
+# wall of elites -- the rarest tier by construction, but also the only
+# thing shown first (#20 follow-up). Grouping by position first means the
+# opening view is a realistic cross-section of the roster instead of just
+# the single overall-richest position group (DEF, being ~10 real positions
+# merged into one, dominated a pure OVR sort).
+_POSITION_ORDER = case(
+    {pos: i for i, pos in enumerate([Position.QB, Position.RB, Position.WR, Position.TE, Position.K, Position.DEF])},
+    value=Player.position,
+)
 
 
 @router.get("/", response_model=list[PlayerOut])
@@ -42,7 +54,7 @@ def list_market(
     response.headers["X-Total-Count"] = str(query.order_by(None).count())
 
     return (
-        query.order_by(Player.overall.desc(), Player.market_price.desc())
+        query.order_by(_POSITION_ORDER, Player.overall.desc(), Player.market_price.desc())
         .offset(offset)
         .limit(limit)
         .all()

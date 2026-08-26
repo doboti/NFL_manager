@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.roster import RosterError, buy_transfer_listed_player
+from app.models.enums import Position
 from app.models.player import Player
 from app.models.team import Team
 from app.models.user import User
@@ -12,6 +14,13 @@ from app.schemas.team import TeamOut
 
 router = APIRouter(prefix="/transfers", tags=["transfers"])
 
+# Same fix as market.py's _POSITION_ORDER (#20 follow-up) -- a pure
+# OVR-descending default made this list look like a wall of elites too.
+_POSITION_ORDER = case(
+    {pos: i for i, pos in enumerate([Position.QB, Position.RB, Position.WR, Position.TE, Position.K, Position.DEF])},
+    value=Player.position,
+)
+
 
 @router.get("/", response_model=list[PlayerOut])
 def list_transfer_listed(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -19,7 +28,7 @@ def list_transfer_listed(current_user: User = Depends(get_current_user), db: Ses
     query = db.query(Player).filter(Player.listed_for_transfer.is_(True))
     if team is not None:
         query = query.filter(Player.team_id != team.id)
-    return query.order_by(Player.overall.desc()).all()
+    return query.order_by(_POSITION_ORDER, Player.overall.desc()).all()
 
 
 @router.post("/{player_id}/buy", response_model=TeamOut)
