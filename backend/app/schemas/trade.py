@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import TradeStatus
+from app.models.enums import Position, TradeStatus
 from app.schemas.player import PlayerOut
 
 
@@ -28,3 +28,14 @@ class TradeOfferOut(BaseModel):
     created_at: datetime
     resolved_at: datetime | None
     respond_at: datetime | None
+
+
+class PlayerSearchResult(BaseModel):
+    id: int
+    first_name: str
+    last_name: str
+    position: Position
+    overall: int
+    potential: int | None
+    team_id: int | None
+    team_name: str | None

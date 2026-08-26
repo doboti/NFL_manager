@@ -40,6 +40,7 @@ class ScheduledMatch(BaseModel):
     away_team_name: str
     home_team_logo_url: str | None
     away_team_logo_url: str | None
+    home_win_probability: float
     scheduled_at: datetime
     is_playoff: bool
     playoff_round: str | None

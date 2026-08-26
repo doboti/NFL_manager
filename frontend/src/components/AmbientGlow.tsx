@@ -8,6 +8,16 @@ export default function AmbientGlow() {
 
   return (
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden" aria-hidden>
+      {/* Faint yard-line texture -- a nod to the field itself, kept nearly
+          invisible (2% opacity) so it never competes with foreground content. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0px, rgba(255,255,255,0.05) 1px, transparent 1px, transparent 96px)",
+          opacity: 0.4,
+        }}
+      />
       <div
         className="absolute -left-32 -top-32 h-[32rem] w-[32rem] rounded-full blur-3xl"
         style={{ backgroundColor: primary, opacity: 0.16 }}

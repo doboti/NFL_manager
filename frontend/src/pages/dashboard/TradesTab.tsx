@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { ArrowLeftRight } from "lucide-react";
+import { ArrowLeftRight, Search } from "lucide-react";
 import {
   Player,
+  PlayerSearchResult,
   Team,
   TeamSummary,
   TradeOffer,
@@ -13,6 +14,7 @@ import {
   listOtherTeams,
   listTradeOffers,
   rejectTradeOffer,
+  searchPlayers,
 } from "../../api/client";
 import PlayerAvatar from "../../components/PlayerAvatar";
 import CountdownText from "../../components/CountdownText";
@@ -119,6 +121,75 @@ function OfferRow({
   );
 }
 
+function PlayerSearch({ ownTeamId }: { ownTeamId: number }) {
+  const [term, setTerm] = useState("");
+  const [results, setResults] = useState<PlayerSearchResult[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const query = term.trim();
+    if (query.length < 2) {
+      setResults(null);
+      return;
+    }
+    setSearching(true);
+    const handle = setTimeout(() => {
+      searchPlayers(query)
+        .then(setResults)
+        .catch(() => setResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [term]);
+
+  return (
+    <div className="mb-6">
+      <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold">
+        <Search size={16} className="text-team-text" /> Játékos kereső
+      </h2>
+      <input
+        type="text"
+        value={term}
+        onChange={(e) => setTerm(e.target.value)}
+        placeholder="Keress egy játékosra név szerint..."
+        className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
+      />
+      {searching && <p className="mt-2 text-xs text-slate-500">Keresés...</p>}
+      {!searching && results !== null && results.length === 0 && (
+        <p className="mt-2 text-xs text-slate-500">Nincs találat.</p>
+      )}
+      {!searching && results !== null && results.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {results.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center justify-between rounded-lg bg-black/20 px-3 py-2 text-sm"
+            >
+              <span>
+                {p.first_name} {p.last_name}{" "}
+                <span className="text-xs text-slate-500">
+                  ({p.position}, OVR {p.overall})
+                </span>
+              </span>
+              <span
+                className={
+                  p.team_id === ownTeamId
+                    ? "text-xs font-semibold text-emerald-400"
+                    : p.team_id === null
+                      ? "text-xs text-slate-500"
+                      : "text-xs text-slate-300"
+                }
+              >
+                {p.team_id === ownTeamId ? "Nálad" : p.team_name ?? "Szabadügynök"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TradesTab({ team, onTeamUpdate }: Props) {
   const [offers, setOffers] = useState<TradeOffer[] | null>(null);
   const [otherTeams, setOtherTeams] = useState<TeamSummary[]>([]);
@@ -183,6 +254,8 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
         Az AI vezette csapatok a napi liga-ciklus során bírálják el a nekik küldött ajánlatokat (nagyjából valós
         áras ajánlatot fogadnak el).
       </p>
+
+      <PlayerSearch ownTeamId={team.id} />
 
       <div className="mb-6">
         <PrimaryButton onClick={() => setShowForm((v) => !v)}>

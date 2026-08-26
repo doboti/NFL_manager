@@ -90,6 +90,7 @@ export interface ScheduledMatch {
   away_team_name: string;
   home_team_logo_url: string | null;
   away_team_logo_url: string | null;
+  home_win_probability: number;
   scheduled_at: string;
   is_playoff: boolean;
   playoff_round: string | null;
@@ -541,6 +542,22 @@ export async function rejectTradeOffer(offerId: number) {
 
 export async function cancelTradeOffer(offerId: number) {
   const { data } = await apiClient.post<TradeOffer>(`/trades/${offerId}/cancel`);
+  return data;
+}
+
+export interface PlayerSearchResult {
+  id: number;
+  first_name: string;
+  last_name: string;
+  position: string;
+  overall: number;
+  potential: number | null;
+  team_id: number | null;
+  team_name: string | null;
+}
+
+export async function searchPlayers(name: string) {
+  const { data } = await apiClient.get<PlayerSearchResult[]>("/trades/search", { params: { name } });
   return data;
 }
 

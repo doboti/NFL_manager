@@ -130,6 +130,15 @@ export default function OverviewTab({ team, onTeamUpdate }: Props) {
             <p className="mt-3 text-center text-xs text-slate-500">
               {new Date(upcoming.scheduled_at).toLocaleString("hu-HU")}
             </p>
+            <p className="mt-1 text-center text-xs font-semibold text-team-text">
+              Esély a győzelemre:{" "}
+              {Math.round(
+                (upcoming.home_team_id === team.id
+                  ? upcoming.home_win_probability
+                  : 1 - upcoming.home_win_probability) * 100
+              )}
+              %
+            </p>
           </>
         ) : (
           <p className="text-sm text-slate-400">
@@ -259,8 +268,26 @@ export default function OverviewTab({ team, onTeamUpdate }: Props) {
                   {s.daily_amount.toLocaleString("hu-HU")} FT/nap
                   {s.win_bonus > 0 && ` + ${s.win_bonus.toLocaleString("hu-HU")} FT győzelmi bónusz`}
                 </div>
-                <div className="text-slate-500">
+                <div className="mb-2 text-slate-500">
                   Lejár: <CountdownText target={s.expires_at} />
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/30">
+                  <motion.div
+                    className="h-1.5 rounded-full bg-team-primary"
+                    initial={false}
+                    animate={{
+                      width: `${Math.min(
+                        100,
+                        Math.max(
+                          2,
+                          ((virtualNow() - new Date(s.signed_at).getTime()) /
+                            (new Date(s.expires_at).getTime() - new Date(s.signed_at).getTime())) *
+                            100
+                        )
+                      )}%`,
+                    }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                  />
                 </div>
               </Card>
             </motion.div>

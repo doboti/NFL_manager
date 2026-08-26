@@ -50,3 +50,18 @@ class Match(Base):
     @property
     def away_team_logo_url(self) -> str | None:
         return self.away_team.logo_url
+
+    @staticmethod
+    def _avg_overall(team: "Team") -> float:
+        if not team.players:
+            return 60.0
+        return sum(p.overall for p in team.players) / len(team.players)
+
+    @property
+    def home_win_probability(self) -> float:
+        """Elo-style estimate from each roster's average OVR (#17 --
+        the "becsült esélyek" next-match odds display never had a data
+        source to draw from). /20 divisor keeps a realistic ~10-point
+        roster gap around 76% instead of a near-certainty."""
+        diff = self._avg_overall(self.home_team) - self._avg_overall(self.away_team)
+        return round(1 / (1 + 10 ** (-diff / 20)), 3)

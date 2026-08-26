@@ -1,14 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.trades import TradeError, accept_offer, cancel_offer, create_offer, reject_offer
+from app.models.player import Player
 from app.models.team import Team
 from app.models.trade_offer import TradeOffer
 from app.models.user import User
-from app.schemas.trade import CreateTradeOfferRequest, TradeOfferOut
+from app.schemas.trade import CreateTradeOfferRequest, PlayerSearchResult, TradeOfferOut
 
 router = APIRouter(prefix="/trades", tags=["trades"])
 
@@ -36,6 +37,44 @@ def list_offers(current_user: User = Depends(get_current_user), db: Session = De
         or_(TradeOffer.from_team_id == team.id, TradeOffer.to_team_id == team.id)
     )
     return _query_options(query).order_by(TradeOffer.created_at.desc()).all()
+
+
+@router.get("/search", response_model=list[PlayerSearchResult])
+def search_players(
+    name: str = Query(..., min_length=1, max_length=50),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """#22: find a player by name anywhere in your own league (any team, or
+    a free agent) and see who currently has them and their overall --
+    scoped to your own league so this can't leak players from other
+    leagues (college into an NFL search, etc.), same concern as #24."""
+    team = _get_team(current_user, db)
+    pattern = f"%{name}%"
+    players = (
+        db.query(Player)
+        .options(joinedload(Player.team))
+        .filter(
+            Player.league_id == team.league_id,
+            (Player.first_name.ilike(pattern)) | (Player.last_name.ilike(pattern)),
+        )
+        .order_by(Player.overall.desc())
+        .limit(30)
+        .all()
+    )
+    return [
+        PlayerSearchResult(
+            id=p.id,
+            first_name=p.first_name,
+            last_name=p.last_name,
+            position=p.position,
+            overall=p.overall,
+            potential=p.potential,
+            team_id=p.team_id,
+            team_name=p.team.name if p.team is not None else None,
+        )
+        for p in players
+    ]
 
 
 @router.post("/offer", response_model=TradeOfferOut, status_code=status.HTTP_201_CREATED)
