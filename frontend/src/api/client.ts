@@ -403,19 +403,6 @@ export async function getPlayoffBracket() {
   return data;
 }
 
-export interface SeasonHistoryEntry {
-  season: number;
-  wins: number;
-  losses: number;
-  ties: number;
-  playoff_result: string;
-}
-
-export async function getSeasonHistory() {
-  const { data } = await apiClient.get<SeasonHistoryEntry[]>("/teams/me/history");
-  return data;
-}
-
 export interface Achievement {
   code: string;
   name: string;

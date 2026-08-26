@@ -4,18 +4,16 @@ import {
   DivisionStandings,
   PlayoffMatch,
   ScheduledMatch,
-  SeasonHistoryEntry,
   SeasonStatus,
   Team,
   TeamRoster,
   fetchTeamRoster,
   getLeagueSchedule,
   getPlayoffBracket,
-  getSeasonHistory,
   getSeasonStatus,
   getStandings,
 } from "../../api/client";
-import { CalendarClock, History, Trophy } from "lucide-react";
+import { CalendarClock, Trophy } from "lucide-react";
 import { Card, SectionHeading } from "../../components/ui";
 import { SkeletonBlock } from "../../components/Skeleton";
 import { useVirtualTime } from "../../context/TimeContext";
@@ -28,14 +26,6 @@ const PLAYOFF_ROUND_LABELS: Record<string, string> = {
   conference_semifinal: "Konferencia elődöntő",
   conference_final: "Konferencia döntő",
   super_bowl: "Super Bowl",
-};
-
-const PLAYOFF_RESULT_LABELS: Record<string, string> = {
-  missed_playoffs: "Nem jutott rájátszásba",
-  conference_semifinal: "Konferencia elődöntő",
-  conference_final: "Konferencia döntő",
-  runner_up: "Super Bowl vesztes",
-  champion: "Bajnok",
 };
 
 const PHASE_LABELS: Record<string, string> = {
@@ -55,7 +45,6 @@ export default function LeagueTab({ team }: Props) {
   const [season, setSeason] = useState<SeasonStatus | null>(null);
   const [standings, setStandings] = useState<DivisionStandings[] | null>(null);
   const [schedule, setSchedule] = useState<ScheduledMatch[] | null>(null);
-  const [history, setHistory] = useState<SeasonHistoryEntry[] | null>(null);
   const [playoffs, setPlayoffs] = useState<PlayoffMatch[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rosterModalOpen, setRosterModalOpen] = useState(false);
@@ -64,12 +53,11 @@ export default function LeagueTab({ team }: Props) {
   const { virtualNow } = useVirtualTime();
 
   useEffect(() => {
-    Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule(), getSeasonHistory(), getPlayoffBracket()])
-      .then(([seasonData, standingsData, scheduleData, historyData, playoffData]) => {
+    Promise.all([getSeasonStatus(), getStandings(), getLeagueSchedule(), getPlayoffBracket()])
+      .then(([seasonData, standingsData, scheduleData, playoffData]) => {
         setSeason(seasonData);
         setStandings(standingsData);
         setSchedule(scheduleData);
-        setHistory(historyData);
         setPlayoffs(playoffData);
       })
       .catch(() => setError("Nem sikerült betölteni a liga adatait."));
@@ -256,36 +244,6 @@ export default function LeagueTab({ team }: Props) {
             );
           })}
         </div>
-      )}
-
-      {history !== null && history.length > 0 && (
-        <>
-          <SectionHeading icon={History} className="mt-8">Korábbi szezonok</SectionHeading>
-          <div className="overflow-x-auto rounded-xl border border-slate-800/80 bg-slate-900/70">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[10px] uppercase text-slate-600">
-                  <th className="p-3 font-medium">Szezon</th>
-                  <th className="p-3 font-medium">Mérleg</th>
-                  <th className="p-3 font-medium">Eredmény</th>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((h) => (
-                  <tr key={h.season} className="border-t border-slate-800 text-slate-300">
-                    <td className="p-3">{h.season}.</td>
-                    <td className="p-3">
-                      {h.wins}Gy {h.losses}V {h.ties}D
-                    </td>
-                    <td className={h.playoff_result === "champion" ? "p-3 font-bold text-team-text" : "p-3"}>
-                      {PLAYOFF_RESULT_LABELS[h.playoff_result] ?? h.playoff_result}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
       )}
 
       <AnimatePresence>

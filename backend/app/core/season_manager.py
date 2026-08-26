@@ -303,7 +303,16 @@ def end_season(db: Session, league: League, now: datetime, champion_id: int) -> 
         team.losses = 0
         team.ties = 0
 
-    league.season += 1
+    # The league is a single self-contained season, not an ongoing dynasty --
+    # once it ends, everything (already reset above: roster, ratings,
+    # economy) plus the season counter itself goes back to a fresh "season
+    # 1", never incrementing indefinitely. A manager's own career
+    # (achievements/level, computed in core/achievements.py purely from
+    # SeasonHistory row counts) is unaffected by this -- it never reads the
+    # `season` number, just counts completed rows -- so it keeps
+    # accumulating across many separate one-season playthroughs exactly as
+    # intended.
+    league.season = 1
     league.phase = SeasonPhase.REGULAR
     league.season_day = 0
     league.current_playoff_round = None
