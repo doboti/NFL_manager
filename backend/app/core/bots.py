@@ -23,8 +23,13 @@ from app.models.trade_offer import TradeOffer
 from app.models.user import User
 
 # Small per-team, per-daily-cycle odds -- keeps bot activity visible without
-# flooding the market/inbox.
-BOT_TRADE_INITIATION_CHANCE = 0.15
+# flooding the market/inbox. Trade initiation is deliberately low even though
+# it reads as "only 5%": with ~30 other bot teams each rolling the same odds
+# against random targets, any one team's real per-day odds of being swept
+# into *some* trade (as initiator or target) is several times higher than
+# this number alone suggests (fixes #18 -- what looked like implausibly fast
+# opponent development was actually this trade churn, not rating inflation).
+BOT_TRADE_INITIATION_CHANCE = 0.05
 BOT_TRANSFER_LISTING_CHANCE = 0.20
 BOT_MAX_LISTED_PLAYERS = 1
 
@@ -181,7 +186,7 @@ def bot_initiate_trades(db: Session, league: League, now: datetime) -> int:
         target_team = random.choice(other_teams)
         target_player = random.choice(target_team.players)
 
-        cash_offer = round(_player_value(target_player) * random.uniform(1.0, 1.3))
+        cash_offer = round(_player_value(target_player) * random.uniform(1.0, 1.15))
         if cash_offer > bot_team.franchise_capital:
             continue
 
