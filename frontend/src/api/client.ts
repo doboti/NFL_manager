@@ -26,8 +26,9 @@ export interface Player {
   position: string;
   age: number;
   overall: number;
+  potential: number | null;
   xp: number;
-  xp_to_next_level: number;
+  sessions_to_next_point: number;
   market_price: number | null;
   photo_url: string | null;
   nfl_team: string | null;

@@ -4,7 +4,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.core.game_data import xp_to_next_level
+from app.core.game_data import sessions_required_for_next_point
 from app.models.enums import Position
 
 
@@ -22,6 +22,13 @@ class Player(Base):
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     overall: Mapped[int] = mapped_column(Integer, nullable=False)
     base_overall: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Ceiling training can never push overall past (see #20) -- nullable only
+    # because existing rows predate this column; backfill_potential.py sets
+    # it for every row, and new imports always set it explicitly.
+    potential: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Sessions banked toward the next point at the current training band
+    # (see game_data.sessions_required_for_next_point) -- resets on level-up
+    # since the required count changes per band.
     xp: Mapped[int] = mapped_column(Integer, default=0)
 
     market_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -42,5 +49,5 @@ class Player(Base):
     team: Mapped["Team | None"] = relationship(back_populates="players")
 
     @property
-    def xp_to_next_level(self) -> int:
-        return xp_to_next_level(self.overall)
+    def sessions_to_next_point(self) -> int:
+        return sessions_required_for_next_point(self.overall)

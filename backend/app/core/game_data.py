@@ -280,7 +280,23 @@ SPONSOR_TEMPLATES = [
 ]
 SPONSOR_TEMPLATES_BY_KEY = {t["key"]: t for t in SPONSOR_TEMPLATES}
 
-BASE_TRAINING_XP = 1000
+# --- training: sessions needed per +1 OVR, banded by current rating (#20) --
+# fast early growth, then a real, deliberate wall approaching the 90s so a
+# rating that high stays meaningful instead of something everyone reaches.
+TRAINING_SESSIONS_PER_POINT = [
+    (80, 1),
+    (90, 4),
+    (95, 10),
+    (100, 25),
+]
+
+
+def sessions_required_for_next_point(overall: int) -> int:
+    for threshold, sessions in TRAINING_SESSIONS_PER_POINT:
+        if overall < threshold:
+            return sessions
+    return TRAINING_SESSIONS_PER_POINT[-1][1]
+
 
 LEAGUE_TIMEZONE = "Europe/Budapest"
 MATCH_HOUR = 21
@@ -309,20 +325,6 @@ BASE_DAILY_SALARY = 1_500
 
 def player_daily_salary(overall: int) -> int:
     return round(BASE_DAILY_SALARY * (overall / 50) ** 2)
-
-
-def age_xp_multiplier(age: int) -> float:
-    if 18 <= age <= 21:
-        return 1.5
-    if 22 <= age <= 25:
-        return 1.0
-    if 26 <= age <= 29:
-        return 0.5
-    return 0.1
-
-
-def xp_to_next_level(ovr: int) -> int:
-    return ovr * 100
 
 
 def player_market_value(base_price: float, ovr: int, age: int) -> float:

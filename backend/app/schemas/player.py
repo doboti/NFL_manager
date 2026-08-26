@@ -15,8 +15,9 @@ class PlayerOut(BaseModel):
     position: Position
     age: int
     overall: int
+    potential: int | None
     xp: int
-    xp_to_next_level: int
+    sessions_to_next_point: int
     market_price: int | None
     photo_url: str | None
     nfl_team: str | None

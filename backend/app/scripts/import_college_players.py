@@ -65,18 +65,37 @@ def fetch_roster(espn_team_id: str) -> dict:
     return resp.json()
 
 
-def generate_overall(class_years: int, depth_index: int) -> int:
-    """No real rating exists in the source data, but ESPN's roster listing
-    order within a position is a real signal (`depth_index` -- 0 is the
-    player ESPN lists first, almost always the starter), same as the NFL
-    import now uses (see its generate_overall docstring, issue #19) --
-    class year plus depth chart position instead of a wide random band with
-    a flat lucky-roll bonus regardless of who the player actually is."""
-    base = 55.0
-    class_component = min(class_years, 5) * 4.5
-    depth_component = (4 - min(depth_index, 12)) * 2.5
+def generate_ratings(class_years: int, depth_index: int) -> tuple[int, int]:
+    """Same philosophy as the NFL import's generate_ratings() (see its
+    docstring, issues #19/#20): depth-chart position + real class-year
+    experience set a realistic, capped baseline, and only a rare,
+    signal-weighted "elite roll" can reach the 85-95 range -- being a
+    senior starter meaningfully improves the odds, but it's never
+    guaranteed. Returns (overall, potential).
+
+    depth_index must be scoped per real ESPN position label, not per merged
+    Position enum bucket -- see the depth_index build site in
+    import_players() below for why."""
+    base = 58.0
+    class_component = min(class_years, 5) * 3.2
+    depth_component = (4 - min(depth_index, 12)) * 1.5
     noise = random.uniform(-4, 4)
-    return max(38, min(95, round(base + class_component + depth_component + noise)))
+    baseline = max(42, min(80, round(base + class_component + depth_component + noise)))
+
+    elite_chance = 0.02 + (0.05 if depth_index == 0 else 0) + (0.03 if class_years >= 4 else 0)
+    if random.random() < elite_chance:
+        overall = random.randint(85, 95)
+        potential = min(95, overall + random.randint(0, 4))
+        return overall, potential
+
+    if class_years <= 1:
+        headroom = random.randint(6, 14)
+    elif class_years <= 3:
+        headroom = random.randint(2, 8)
+    else:
+        headroom = random.randint(0, 3)
+    potential = min(84, baseline + headroom)
+    return baseline, potential
 
 
 def import_players(db: Session) -> dict:
@@ -90,7 +109,7 @@ def import_players(db: Session) -> dict:
         print(f"Importing roster: {team['name']} ({code})")
 
         roster = fetch_roster(team["espn_id"])
-        position_depth: dict[Position, int] = {}
+        position_depth: dict[str, int] = {}
         for group in roster.get("athletes", []):
             if group.get("position") not in ACTIVE_GROUPS:
                 continue
@@ -102,8 +121,10 @@ def import_players(db: Session) -> dict:
                     skipped += 1
                     continue
 
-                depth_index = position_depth.get(position, 0)
-                position_depth[position] = depth_index + 1
+                # Keyed by the raw ESPN label, not the merged Position
+                # bucket -- see generate_ratings()'s docstring.
+                depth_index = position_depth.get(espn_position, 0)
+                position_depth[espn_position] = depth_index + 1
 
                 espn_id = athlete["id"]
                 display_name = athlete.get("displayName", "")
@@ -116,7 +137,7 @@ def import_players(db: Session) -> dict:
                 existing = db.query(Player).filter(Player.espn_id == espn_id).first()
 
                 if existing is None:
-                    overall = generate_overall(class_years, depth_index)
+                    overall, potential = generate_ratings(class_years, depth_index)
                     player = Player(
                         team_id=None,
                         league_id=league.id,
@@ -126,6 +147,7 @@ def import_players(db: Session) -> dict:
                         age=age,
                         overall=overall,
                         base_overall=overall,
+                        potential=potential,
                         market_price=max(1, round(player_market_value(BASE_MARKET_PRICE, overall, age))),
                         espn_id=espn_id,
                         photo_url=headshot,
@@ -138,12 +160,13 @@ def import_players(db: Session) -> dict:
                     existing.nfl_team = code
                     if existing.team_id is None:
                         # Free agents have no training investment to lose --
-                        # safe to re-rate with the improved formula (#19) on
-                        # every re-run, instead of being stuck with whatever
-                        # the old random roll gave them at first import.
-                        overall = generate_overall(class_years, depth_index)
+                        # safe to re-rate with the improved formula (#19/#20)
+                        # on every re-run, instead of being stuck with
+                        # whatever the old random roll gave them.
+                        overall, potential = generate_ratings(class_years, depth_index)
                         existing.overall = overall
                         existing.base_overall = overall
+                        existing.potential = potential
                         existing.market_price = max(
                             1, round(player_market_value(BASE_MARKET_PRICE, overall, existing.age))
                         )

@@ -202,7 +202,10 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
       />
 
       <SectionHeading icon={Users}>Keret · Edzésslotok: {training.length}/3</SectionHeading>
-      <p className="mb-3 -mt-2 text-xs text-slate-500">Minden befejezett edzés +1 OVR-t ad, kortól függetlenül.</p>
+      <p className="mb-3 -mt-2 text-xs text-slate-500">
+        Az edzés minden játékos egyéni potenciáljáig fejleszti az OVR-t -- minél közelebb vagy hozzá, annál több
+        edzés kell egy pontért.
+      </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" style={{ perspective: 1000 }}>
         {team.players.map((player, i) => {
           const session = trainingByPlayer.get(player.id);
@@ -231,7 +234,16 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                       Sérült
                     </div>
                   )}
-                  <div className="mt-0.5 text-[10px] opacity-70">Összes edzés-XP: {player.xp}</div>
+                  <div className="mt-0.5 text-[10px] opacity-70">
+                    {player.potential !== null && player.overall >= player.potential ? (
+                      <>Elérte a potenciálját ({player.potential})</>
+                    ) : (
+                      <>
+                        Potenciál: {player.potential ?? 99} · {player.xp}/{player.sessions_to_next_point} edzés a
+                        köv. pontig
+                      </>
+                    )}
+                  </div>
                 </div>
               }
               footer={

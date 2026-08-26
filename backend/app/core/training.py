@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now_utc
 from app.core.config import settings
-from app.core.game_data import BASE_TRAINING_XP, age_xp_multiplier
+from app.core.game_data import sessions_required_for_next_point
 from app.models.player import Player
 from app.models.training import TrainingSession
 
@@ -79,16 +79,21 @@ def collect_training(db: Session, team_id: int, session_id: int) -> TrainingSess
         raise TrainingError("Training is not finished yet")
 
     player = session.player
-    xp_gain = round(BASE_TRAINING_XP * age_xp_multiplier(player.age))
+    potential = player.potential if player.potential is not None else 99
+    xp_gain = 0
 
-    # xp is a cosmetic career-total stat only -- it no longer gates the
-    # level-up. It used to (xp >= ovr*100, scaled down hard by age), which
-    # meant a veteran or high-OVR player could need 50-90+ sessions for a
-    # single point, well outside a 17-day season. A completed session now
-    # always earns the point it promises.
-    player.xp += xp_gain
-    if player.overall < 99:
-        player.overall += 1
+    # A session banks progress toward the next point; how many sessions
+    # that takes grows sharply as overall climbs (see
+    # game_data.sessions_required_for_next_point) -- fast early growth, a
+    # real grind approaching 90+, and nothing at all once potential is hit
+    # (#20 -- the flat "always +1" fix from #15 was too generous long-term).
+    if player.overall < potential:
+        required = sessions_required_for_next_point(player.overall)
+        player.xp += 1
+        xp_gain = 1
+        if player.xp >= required:
+            player.xp = 0
+            player.overall = min(potential, player.overall + 1)
 
     session.xp_awarded = xp_gain
     session.completed = True

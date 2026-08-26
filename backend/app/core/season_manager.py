@@ -187,16 +187,33 @@ def advance_playoffs(db: Session, league: League, now: datetime) -> dict | None:
 
 def reset_player_ratings(db: Session, league: League) -> dict:
     """Every player stays in the league permanently (no retirement) -- each
-    new season just wipes out the previous season's training gains, so
-    everyone starts back at their original imported rating."""
+    new season wipes out the previous season's training gains, so everyone
+    starts back at their (age-adjusted) baseline rating.
+
+    Ages 30-32 lose 1 point and 33+ lose 2 points from base_overall itself
+    (and potential, clamped so it never drops below base_overall) *before*
+    the reset applies (#20) -- without this, a season-end reset to
+    base_overall alone would let a player sit at their peak forever, since
+    nothing about the baseline itself ever changed. This is what makes
+    aging actually stick long-term instead of being wiped out immediately,
+    forcing real roster turnover."""
     all_players = db.query(Player).filter(Player.league_id == league.id).all()
+    declined = 0
     for player in all_players:
         player.age += 1
+        if player.age >= 33:
+            player.base_overall = max(40, player.base_overall - 2)
+            declined += 1
+        elif player.age >= 30:
+            player.base_overall = max(40, player.base_overall - 1)
+            declined += 1
+        if player.potential is not None:
+            player.potential = max(player.base_overall, player.potential - (1 if player.age >= 30 else 0))
         player.overall = player.base_overall
         player.xp = 0
 
     db.flush()
-    return {"aged": len(all_players), "ratings_reset": len(all_players)}
+    return {"aged": len(all_players), "ratings_reset": len(all_players), "declined": declined}
 
 
 def reset_team_economy(db: Session, league: League) -> int:
