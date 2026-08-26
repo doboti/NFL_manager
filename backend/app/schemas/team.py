@@ -78,3 +78,4 @@ class AchievementOut(BaseModel):
     name: str
     description: str
     earned: bool
+    progress_text: str | None = None

@@ -42,3 +42,11 @@ class Match(Base):
     @property
     def away_team_name(self) -> str:
         return self.away_team.name
+
+    @property
+    def home_team_logo_url(self) -> str | None:
+        return self.home_team.logo_url
+
+    @property
+    def away_team_logo_url(self) -> str | None:
+        return self.away_team.logo_url

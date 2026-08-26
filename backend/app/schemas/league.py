@@ -38,6 +38,8 @@ class ScheduledMatch(BaseModel):
     away_team_id: int
     home_team_name: str
     away_team_name: str
+    home_team_logo_url: str | None
+    away_team_logo_url: str | None
     scheduled_at: datetime
     is_playoff: bool
     playoff_round: str | None
