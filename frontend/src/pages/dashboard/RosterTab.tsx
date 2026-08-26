@@ -304,6 +304,7 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                           if (!window.confirm(`Biztosan elengeded ${player.first_name} ${player.last_name}-t?`)) return;
                           await releasePlayer(player.id);
                           onTeamUpdate(await fetchMyTeam());
+                          setTraining(await listTraining());
                         })
                       }
                       className="flex-1 rounded-lg bg-black/20 py-1 text-[11px] font-semibold hover:bg-red-950/60 hover:text-red-300 disabled:opacity-30"

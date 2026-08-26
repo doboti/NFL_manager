@@ -5,7 +5,6 @@ from app.core.bots import seed_bot_teams
 from app.core.clock import list_leagues
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.core.market import refill_market
 from app.core.scheduler import start_scheduler
 from app.routers import admin, auth, league, market, matches, roster, sponsors, stadium, teams, trades, training, transfers
 
@@ -39,7 +38,6 @@ def on_startup():
     db = SessionLocal()
     try:
         for league in list_leagues(db):
-            refill_market(db, league)
             seed_bot_teams(db, league)
     finally:
         db.close()

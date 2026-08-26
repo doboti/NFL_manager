@@ -68,6 +68,9 @@ def buy_transfer_listed_player(db: Session, buyer_team: Team, player_id: int) ->
     if player is None:
         raise RosterError("Player is not listed for transfer")
 
+    if player.league_id != buyer_team.league_id:
+        raise RosterError("Player is not in your league")
+
     if player.team_id == buyer_team.id:
         raise RosterError("You already own this player")
 

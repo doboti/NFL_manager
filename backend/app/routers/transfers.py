@@ -25,9 +25,17 @@ _POSITION_ORDER = case(
 @router.get("/", response_model=list[PlayerOut])
 def list_transfer_listed(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     team = db.query(Team).filter(Team.owner_id == current_user.id).first()
-    query = db.query(Player).filter(Player.listed_for_transfer.is_(True))
-    if team is not None:
-        query = query.filter(Player.team_id != team.id)
+    if team is None:
+        return []
+
+    # #24: this had no league scoping at all, so a human's transfer-market
+    # tab could show players listed by teams in a *different* league (e.g.
+    # college players leaking into an NFL manager's view).
+    query = db.query(Player).filter(
+        Player.listed_for_transfer.is_(True),
+        Player.league_id == team.league_id,
+        Player.team_id != team.id,
+    )
     return query.order_by(_POSITION_ORDER, Player.overall.desc()).all()
 
 

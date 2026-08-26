@@ -5,7 +5,6 @@ from app.core.clock import list_leagues, now_utc
 from app.core.economy import apply_player_salaries, apply_sponsor_payouts, apply_stadium_revenue
 from app.core.injuries import maybe_injure_player
 from app.core.league_schedule import ensure_fixtures_scheduled
-from app.core.market import refill_market
 from app.core.season_manager import advance_playoffs, advance_regular_season_day
 from app.core.simulation import select_starting_lineup, simulate_match
 from app.models.enums import SeasonPhase
@@ -101,14 +100,16 @@ def run_daily_cycle(db: Session) -> dict:
             }
         )
 
+    # Real ESPN-imported players are the sole source of free agents now (#24)
+    # -- the old synthetic-filler fallback polluted the pool with
+    # nonsense-named low-effort players that never cleared out once real
+    # data arrived. Kept at a constant 0 for API/schema stability.
     new_market_players = 0
     season_summaries = []
     playoff_events = {}
     bot_progression_total = 0
 
     for league in leagues:
-        new_market_players += refill_market(db, league)
-
         if league.phase == SeasonPhase.REGULAR:
             advance_regular_season_day(db, league, now)
 

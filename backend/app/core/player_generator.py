@@ -1,6 +1,5 @@
 import random
 
-from app.core.game_data import player_market_value
 from app.models.enums import Position
 from app.models.player import Player
 
@@ -20,22 +19,22 @@ STARTING_ROSTER = [
     Position.TE, Position.K, Position.DEF,
 ]
 
-BASE_MARKET_PRICE = 1000
-
 
 def random_name() -> tuple[str, str]:
     return random.choice(FIRST_NAMES), random.choice(LAST_NAMES)
 
 
 def generate_player(position: Position, min_age: int = 21, max_age: int = 32,
-                     min_ovr: int = 50, max_ovr: int = 75, for_market: bool = False) -> Player:
+                     min_ovr: int = 50, max_ovr: int = 75) -> Player:
+    """Ephemeral opponent generation for practice matches only (never
+    persisted -- see matches.py's /practice route). Real free agents come
+    exclusively from the ESPN import scripts (#24: a separate synthetic
+    market-filler path used to seed nonsense-named players directly into
+    the persistent free-agent pool whenever it ran low, and those never
+    cleared out once real data arrived)."""
     first_name, last_name = random_name()
     age = random.randint(min_age, max_age)
     overall = random.randint(min_ovr, max_ovr)
-
-    market_price = None
-    if for_market:
-        market_price = max(1, round(player_market_value(BASE_MARKET_PRICE, overall, age)))
 
     return Player(
         first_name=first_name,
@@ -44,7 +43,6 @@ def generate_player(position: Position, min_age: int = 21, max_age: int = 32,
         age=age,
         overall=overall,
         base_overall=overall,
-        market_price=market_price,
     )
 
 
@@ -53,8 +51,3 @@ def generate_starting_roster() -> list[Player]:
         generate_player(position, min_age=21, max_age=29, min_ovr=55, max_ovr=68)
         for position in STARTING_ROSTER
     ]
-
-
-def generate_market_player() -> Player:
-    position = random.choice(list(Position))
-    return generate_player(position, min_age=20, max_age=36, min_ovr=45, max_ovr=90, for_market=True)

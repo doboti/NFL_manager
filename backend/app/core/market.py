@@ -1,31 +1,13 @@
 from sqlalchemy.orm import Session
 
-from app.core.player_generator import generate_market_player
-from app.models.league import League
 from app.models.player import Player
 from app.models.team import Team
 
-MARKET_POOL_SIZE = 15
 MAX_ROSTER_SIZE = 100  # a full real NFL roster (~70-90 players) plus room for a few free-agent signings
 
 
 class MarketError(Exception):
     pass
-
-
-def refill_market(db: Session, league: League) -> int:
-    current_count = db.query(Player).filter(Player.league_id == league.id, Player.team_id.is_(None)).count()
-    missing = max(0, MARKET_POOL_SIZE - current_count)
-
-    for _ in range(missing):
-        player = generate_market_player()
-        player.league_id = league.id
-        db.add(player)
-
-    if missing:
-        db.commit()
-
-    return missing
 
 
 def buy_player(db: Session, team: Team, player_id: int) -> Player:
