@@ -189,6 +189,7 @@ export interface TradeOffer {
   status: TradeStatus;
   created_at: string;
   resolved_at: string | null;
+  respond_at: string | null;
 }
 
 // --- auth & team selection ---

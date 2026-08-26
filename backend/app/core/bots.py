@@ -1,4 +1,6 @@
+import random
 import uuid
+from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
@@ -12,13 +14,19 @@ from app.core.game_data import (
 )
 from app.core.security import hash_password
 from app.core.team_setup import assign_real_roster
-from app.core.trades import _cancel_conflicting_offers
+from app.core.trades import TradeError, _cancel_conflicting_offers, create_offer
 from app.models.enums import TradeStatus
 from app.models.league import League
 from app.models.player import Player
 from app.models.team import Team
 from app.models.trade_offer import TradeOffer
 from app.models.user import User
+
+# Small per-team, per-daily-cycle odds -- keeps bot activity visible without
+# flooding the market/inbox.
+BOT_TRADE_INITIATION_CHANCE = 0.15
+BOT_TRANSFER_LISTING_CHANCE = 0.20
+BOT_MAX_LISTED_PLAYERS = 1
 
 BOT_ACCEPT_THRESHOLD = 0.9  # bots accept offers worth at least 90% of the target player's value
 
@@ -96,18 +104,27 @@ def _player_value(player) -> int:
     return max(1, round(player_market_value(1000, player.overall, player.age)))
 
 
-def resolve_bot_trade_offers(db: Session) -> dict:
+def resolve_bot_trade_offers(db: Session, now: datetime | None = None) -> dict:
+    """Resolves any bot-addressed offer whose respond_at has passed -- not
+    every pending one, so a bot's reply lands somewhere in its random 0-4h
+    window (see trades.py: BOT_RESPONSE_WINDOW_HOURS) instead of instantly.
+    A NULL respond_at (an offer from before this existed) resolves right
+    away rather than getting stuck forever."""
+    now = now or now_utc(db)
     pending = (
         db.query(TradeOffer)
         .options(joinedload(TradeOffer.to_team), joinedload(TradeOffer.target_player), joinedload(TradeOffer.offered_player))
         .join(Team, TradeOffer.to_team_id == Team.id)
-        .filter(TradeOffer.status == TradeStatus.PENDING, Team.is_bot.is_(True))
+        .filter(
+            TradeOffer.status == TradeStatus.PENDING,
+            Team.is_bot.is_(True),
+            (TradeOffer.respond_at.is_(None)) | (TradeOffer.respond_at <= now),
+        )
         .all()
     )
 
     accepted = 0
     rejected = 0
-    now = now_utc(db)
 
     for offer in pending:
         target_value = _player_value(offer.target_player)
@@ -141,3 +158,72 @@ def resolve_bot_trade_offers(db: Session) -> dict:
         db.commit()
 
     return {"accepted": accepted, "rejected": rejected}
+
+
+def bot_initiate_trades(db: Session, league: League, now: datetime) -> int:
+    """Each bot team, with a small chance, offers cash for a random player
+    on a random other team in the same league -- bot or human, so this
+    covers both "trade with each other" and "trade with the human players"
+    from issue #14. Reuses create_offer so a bot-to-bot offer also gets a
+    respond_at and resolves through the normal timer; an unaffordable or
+    otherwise invalid attempt is just skipped, not fatal."""
+    teams = db.query(Team).filter(Team.league_id == league.id).all()
+    bot_teams = [t for t in teams if t.is_bot]
+    initiated = 0
+
+    for bot_team in bot_teams:
+        if random.random() >= BOT_TRADE_INITIATION_CHANCE:
+            continue
+
+        other_teams = [t for t in teams if t.id != bot_team.id and t.players]
+        if not other_teams:
+            continue
+        target_team = random.choice(other_teams)
+        target_player = random.choice(target_team.players)
+
+        cash_offer = round(_player_value(target_player) * random.uniform(1.0, 1.3))
+        if cash_offer > bot_team.franchise_capital:
+            continue
+
+        try:
+            create_offer(db, bot_team, target_team.id, target_player.id, None, cash_offer)
+            initiated += 1
+        except TradeError:
+            continue
+
+    return initiated
+
+
+def bot_list_for_transfer(db: Session, league: League) -> int:
+    """Each bot team, with a small chance, lists one of its own players for
+    transfer at a fair price -- fixes issue #16 (the transfer market was
+    always empty because only humans ever listed a player)."""
+    teams = (
+        db.query(Team)
+        .options(joinedload(Team.players))
+        .filter(Team.league_id == league.id, Team.is_bot.is_(True))
+        .all()
+    )
+    listed = 0
+
+    for team in teams:
+        if random.random() >= BOT_TRANSFER_LISTING_CHANCE:
+            continue
+
+        already_listed = sum(1 for p in team.players if p.listed_for_transfer)
+        if already_listed >= BOT_MAX_LISTED_PLAYERS:
+            continue
+
+        candidates = [p for p in team.players if not p.listed_for_transfer]
+        if not candidates:
+            continue
+
+        player = random.choice(candidates)
+        player.asking_price = max(1, round(_player_value(player) * random.uniform(1.0, 1.2)))
+        player.listed_for_transfer = True
+        listed += 1
+
+    if listed:
+        db.flush()
+
+    return listed

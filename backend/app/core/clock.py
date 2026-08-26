@@ -11,12 +11,14 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
 from app.core.game_data import LEAGUES
+from app.models.enums import TradeStatus
 from app.models.game_clock import GameClock
 from app.models.league import League
 from app.models.match import Match
 from app.models.player import Player
 from app.models.sponsor import Sponsor
 from app.models.stadium_upgrade import StadiumUpgrade
+from app.models.trade_offer import TradeOffer
 from app.models.training import TrainingSession
 
 DEFAULT_LEAGUE_KEY = "nfl"
@@ -97,6 +99,9 @@ def reset_time(db: Session) -> datetime:
         db.query(Player).filter(Player.injured_until.isnot(None)).update(
             {Player.injured_until: Player.injured_until - delta}, synchronize_session=False
         )
+        db.query(TradeOffer).filter(
+            TradeOffer.status == TradeStatus.PENDING, TradeOffer.respond_at.isnot(None)
+        ).update({TradeOffer.respond_at: TradeOffer.respond_at - delta}, synchronize_session=False)
 
     db.commit()
     return now_utc(db)

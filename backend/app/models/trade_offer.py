@@ -23,6 +23,7 @@ class TradeOffer(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    respond_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     from_team: Mapped["Team"] = relationship(foreign_keys=[from_team_id])
     to_team: Mapped["Team"] = relationship(foreign_keys=[to_team_id])

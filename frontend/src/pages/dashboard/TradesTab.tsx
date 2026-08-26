@@ -15,6 +15,7 @@ import {
   rejectTradeOffer,
 } from "../../api/client";
 import PlayerAvatar from "../../components/PlayerAvatar";
+import CountdownText from "../../components/CountdownText";
 import { SkeletonBlock } from "../../components/Skeleton";
 import { Card, PrimaryButton, SecondaryButton } from "../../components/ui";
 
@@ -80,6 +81,12 @@ function OfferRow({
         {offer.cash_offer > 0 && <span>{offer.cash_offer.toLocaleString("hu-HU")} FT</span>}
         {!offer.offered_player && offer.cash_offer === 0 && <span className="text-slate-500">semmi</span>}
       </div>
+
+      {offer.status === "PENDING" && offer.respond_at && (
+        <p className="mt-1 text-xs text-slate-500">
+          Válasz várható: <CountdownText target={offer.respond_at} />
+        </p>
+      )}
 
       {offer.status === "PENDING" && (
         <div className="mt-3 flex gap-2">

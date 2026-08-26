@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.bots import apply_bot_progression, resolve_bot_trade_offers
+from app.core.bots import apply_bot_progression, bot_initiate_trades, bot_list_for_transfer, resolve_bot_trade_offers
 from app.core.clock import list_leagues, now_utc
 from app.core.economy import apply_player_salaries, apply_sponsor_payouts, apply_stadium_revenue
 from app.core.injuries import maybe_injure_player
@@ -118,6 +118,7 @@ def run_daily_cycle(db: Session) -> dict:
                 playoff_events[league.key] = event
 
         bot_progression_total += apply_bot_progression(db, league)
+        bot_list_for_transfer(db, league)
 
         ensure_fixtures_scheduled(db, league)
 
@@ -127,7 +128,10 @@ def run_daily_cycle(db: Session) -> dict:
 
     db.commit()
 
-    bot_trades = resolve_bot_trade_offers(db)
+    for league in leagues:
+        bot_initiate_trades(db, league, now)
+
+    bot_trades = resolve_bot_trade_offers(db, now)
 
     return {
         "matches": match_results,

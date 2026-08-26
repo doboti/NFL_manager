@@ -27,3 +27,4 @@ class TradeOfferOut(BaseModel):
     status: TradeStatus
     created_at: datetime
     resolved_at: datetime | None
+    respond_at: datetime | None

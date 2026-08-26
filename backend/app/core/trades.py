@@ -1,11 +1,18 @@
-from datetime import datetime, timezone
+import random
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
+from app.core.clock import now_utc
 from app.models.enums import TradeStatus
 from app.models.player import Player
 from app.models.team import Team
 from app.models.trade_offer import TradeOffer
+
+# A bot addressed with an offer replies within a random window up to this
+# many hours later (checked by a periodic job, not tied to match time), so
+# it doesn't feel like the offer just sits there until the next match.
+BOT_RESPONSE_WINDOW_HOURS = 4.0
 
 
 class TradeError(Exception):
@@ -47,12 +54,17 @@ def create_offer(
     if cash_offer > from_team.franchise_capital:
         raise TradeError("Not enough Franchise Tőke for this offer")
 
+    respond_at = None
+    if to_team.is_bot:
+        respond_at = now_utc(db) + timedelta(hours=random.uniform(0, BOT_RESPONSE_WINDOW_HOURS))
+
     offer = TradeOffer(
         from_team_id=from_team.id,
         to_team_id=to_team_id,
         target_player_id=target_player_id,
         offered_player_id=offered_player_id,
         cash_offer=cash_offer,
+        respond_at=respond_at,
     )
     db.add(offer)
     db.commit()
