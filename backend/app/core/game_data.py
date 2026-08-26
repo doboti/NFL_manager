@@ -338,3 +338,41 @@ def player_market_value(base_price: float, ovr: int, age: int) -> float:
     if ovr > 80:
         value *= 1.08 ** (ovr - 80)
     return value * (35 - age)
+
+
+# --- rank-based player generation (#20 follow-up) ---
+# Each curve is a piecewise-linear percentile->overall mapping: percentile 0
+# is the worst player in a position group, 1 is the best. Checkpoints encode
+# an exact target distribution (e.g. NFL's (0.60, 60) means "60th percentile
+# sits at 60 overall", i.e. 40% of players score above 60) instead of
+# leaving the share of elites to an independent per-player random roll,
+# which drifted unpredictably from run to run. College is kept a notch
+# below NFL to reflect a shallower talent pool.
+NFL_OVR_PERCENTILE_CURVE: list[tuple[float, int]] = [
+    (0.0, 51),
+    (0.60, 60),
+    (0.80, 70),
+    (0.90, 80),
+    (0.99, 89),
+    (1.0, 99),
+]
+
+COLLEGE_OVR_PERCENTILE_CURVE: list[tuple[float, int]] = [
+    (0.0, 46),
+    (0.60, 55),
+    (0.80, 65),
+    (0.90, 75),
+    (0.99, 85),
+    (1.0, 95),
+]
+
+
+def overall_from_percentile(percentile: float, curve: list[tuple[float, int]]) -> int:
+    percentile = max(0.0, min(1.0, percentile))
+    for (lo_p, lo_v), (hi_p, hi_v) in zip(curve, curve[1:]):
+        if percentile <= hi_p:
+            if hi_p == lo_p:
+                return hi_v
+            fraction = (percentile - lo_p) / (hi_p - lo_p)
+            return round(lo_v + fraction * (hi_v - lo_v))
+    return curve[-1][1]
