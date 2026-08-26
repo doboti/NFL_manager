@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { TrendingDown, TrendingUp } from "lucide-react";
 import { Team, fetchMyTeam } from "../api/client";
 import { STADIUM_LEVELS } from "../gameData";
 import AnimatedNumber from "../components/AnimatedNumber";
@@ -19,12 +20,27 @@ export default function Dashboard() {
   const [team, setTeam] = useState<Team | null>(null);
   const [tab, setTab] = useState<TabKey>("overview");
   const [error, setError] = useState<string | null>(null);
+  const [capitalTrend, setCapitalTrend] = useState<{ direction: "up" | "down"; delta: number } | null>(null);
+  const prevCapitalRef = useRef<number | null>(null);
 
   useEffect(() => {
     fetchMyTeam()
       .then(setTeam)
       .catch(() => setError("Nem sikerült betölteni a franchise adatait."));
   }, []);
+
+  useEffect(() => {
+    if (!team) return;
+    if (prevCapitalRef.current !== null && team.franchise_capital !== prevCapitalRef.current) {
+      const delta = team.franchise_capital - prevCapitalRef.current;
+      setCapitalTrend({ direction: delta > 0 ? "up" : "down", delta: Math.abs(delta) });
+      const timeout = setTimeout(() => setCapitalTrend(null), 5000);
+      prevCapitalRef.current = team.franchise_capital;
+      return () => clearTimeout(timeout);
+    }
+    prevCapitalRef.current = team.franchise_capital;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [team?.franchise_capital]);
 
   if (error && !team) return <p className="p-8 text-red-400">{error}</p>;
   if (!team) return <SkeletonDashboard />;
@@ -43,10 +59,25 @@ export default function Dashboard() {
               <div className="mb-6 flex flex-wrap items-center justify-between gap-4 pl-12 lg:pl-0">
                 <div>
                   <h1 className="text-2xl font-bold text-slate-100">{team.name}</h1>
-                  <p className="text-slate-400">
-                    Franchise Tőke: <AnimatedNumber value={team.franchise_capital} suffix=" FT" /> · Stadion szint{" "}
-                    {team.stadium_level} ({STADIUM_LEVELS[team.stadium_level].capacity.toLocaleString("hu-HU")}{" "}
-                    néző) · {team.wins}Gy {team.losses}V {team.ties}D
+                  <p className="flex flex-wrap items-center gap-1 text-slate-400">
+                    <span>
+                      Franchise Tőke: <AnimatedNumber value={team.franchise_capital} suffix=" FT" />
+                    </span>
+                    {capitalTrend && (
+                      <span
+                        className={`flex items-center gap-0.5 text-xs font-semibold ${
+                          capitalTrend.direction === "up" ? "text-emerald-400" : "text-red-400"
+                        }`}
+                      >
+                        {capitalTrend.direction === "up" ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                        {capitalTrend.delta.toLocaleString("hu-HU")}
+                      </span>
+                    )}
+                    <span>
+                      · Stadion szint {team.stadium_level} (
+                      {STADIUM_LEVELS[team.stadium_level].capacity.toLocaleString("hu-HU")} néző) · {team.wins}Gy{" "}
+                      {team.losses}V {team.ties}D
+                    </span>
                   </p>
                   <p className="text-xs text-slate-500">
                     Napi fenntartás (fizetések): -{team.daily_salary_cost.toLocaleString("hu-HU")} FT

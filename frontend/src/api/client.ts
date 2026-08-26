@@ -87,6 +87,8 @@ export interface ScheduledMatch {
   away_team_id: number;
   home_team_name: string;
   away_team_name: string;
+  home_team_logo_url: string | null;
+  away_team_logo_url: string | null;
   scheduled_at: string;
   is_playoff: boolean;
   playoff_round: string | null;
@@ -417,6 +419,7 @@ export interface Achievement {
   name: string;
   description: string;
   earned: boolean;
+  progress_text: string | null;
 }
 
 export async function getAchievements() {

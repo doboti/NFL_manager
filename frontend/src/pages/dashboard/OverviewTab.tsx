@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Landmark, Repeat } from "lucide-react";
+import { Building2, Landmark, Repeat, Swords } from "lucide-react";
 import {
   ScheduledMatch,
   Sponsor,
@@ -21,6 +21,7 @@ import {
 } from "../../api/client";
 import { STADIUM_LEVELS, TACTIC_LABELS } from "../../gameData";
 import CountdownText from "../../components/CountdownText";
+import PlayerAvatar from "../../components/PlayerAvatar";
 import { Card, PrimaryButton, SectionHeading } from "../../components/ui";
 import { useVirtualTime } from "../../context/TimeContext";
 
@@ -75,19 +76,46 @@ export default function OverviewTab({ team, onTeamUpdate }: Props) {
     <div>
       {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
 
-      <Card className="mb-6">
-        <h2 className="mb-1 font-semibold">Liga</h2>
-        <p className="text-sm text-slate-400">
-          Következő meccs: {new Date(upcoming ? upcoming.scheduled_at : team.next_match_at).toLocaleString("hu-HU")} ·
-          hátra: <CountdownText target={upcoming ? upcoming.scheduled_at : team.next_match_at} />
-        </p>
-        {upcoming && (
-          <p className="mt-1 text-sm text-slate-300">
-            Ellenfél:{" "}
-            <span className="font-semibold text-team-text">
-              {upcoming.home_team_id === team.id ? upcoming.away_team_name : upcoming.home_team_name}
-            </span>{" "}
-            ({upcoming.home_team_id === team.id ? "hazai" : "vendég"})
+      <Card highlight className="mb-6">
+        <h2 className="mb-3 flex items-center gap-2 font-semibold">
+          <Swords size={16} className="text-team-text" /> Következő meccs
+        </h2>
+        {upcoming ? (
+          <>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-1 flex-col items-center gap-1.5">
+                <PlayerAvatar firstName={team.name} lastName="" photoUrl={team.logo_url} size={48} />
+                <span className="max-w-full truncate text-xs font-semibold text-slate-200">{team.name}</span>
+              </div>
+              <div className="flex shrink-0 flex-col items-center gap-1 px-1">
+                <span className="text-lg font-black text-slate-600">VS</span>
+                <span className="text-xs font-bold text-team-text">
+                  <CountdownText target={upcoming.scheduled_at} />
+                </span>
+                <span className="rounded bg-black/30 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-400">
+                  {upcoming.home_team_id === team.id ? "Hazai" : "Vendég"}
+                </span>
+              </div>
+              <div className="flex flex-1 flex-col items-center gap-1.5">
+                <PlayerAvatar
+                  firstName={upcoming.home_team_id === team.id ? upcoming.away_team_name : upcoming.home_team_name}
+                  lastName=""
+                  photoUrl={upcoming.home_team_id === team.id ? upcoming.away_team_logo_url : upcoming.home_team_logo_url}
+                  size={48}
+                />
+                <span className="max-w-full truncate text-xs font-semibold text-slate-200">
+                  {upcoming.home_team_id === team.id ? upcoming.away_team_name : upcoming.home_team_name}
+                </span>
+              </div>
+            </div>
+            <p className="mt-3 text-center text-xs text-slate-500">
+              {new Date(upcoming.scheduled_at).toLocaleString("hu-HU")}
+            </p>
+          </>
+        ) : (
+          <p className="text-sm text-slate-400">
+            Következő meccs: {new Date(team.next_match_at).toLocaleString("hu-HU")} · hátra:{" "}
+            <CountdownText target={team.next_match_at} />
           </p>
         )}
       </Card>
