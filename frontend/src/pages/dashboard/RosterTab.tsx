@@ -202,12 +202,12 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
       />
 
       <SectionHeading icon={Users}>Keret · Edzésslotok: {training.length}/3</SectionHeading>
+      <p className="mb-3 -mt-2 text-xs text-slate-500">Minden befejezett edzés +1 OVR-t ad, kortól függetlenül.</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" style={{ perspective: 1000 }}>
         {team.players.map((player, i) => {
           const session = trainingByPlayer.get(player.id);
           const ready = session && new Date(session.ends_at).getTime() <= virtualNow();
           const isInjured = injuredPlayerIds.has(player.id);
-          const xpPct = Math.min(100, (player.xp / player.xp_to_next_level) * 100);
           const isListing = listingPlayerId === player.id;
 
           return (
@@ -227,17 +227,7 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                       Sérült
                     </div>
                   )}
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/20">
-                    <motion.div
-                      className="h-1.5 rounded-full bg-slate-900/70"
-                      initial={false}
-                      animate={{ width: `${xpPct}%` }}
-                      transition={{ duration: 0.6, ease: "easeOut" }}
-                    />
-                  </div>
-                  <div className="mt-0.5 text-[10px] opacity-70">
-                    {player.xp} / {player.xp_to_next_level} XP
-                  </div>
+                  <div className="mt-0.5 text-[10px] opacity-70">Összes edzés-XP: {player.xp}</div>
                 </div>
               }
               footer={
