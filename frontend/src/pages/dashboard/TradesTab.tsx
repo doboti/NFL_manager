@@ -31,6 +31,13 @@ const STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Visszavonva",
 };
 
+const STATUS_STYLES: Record<string, string> = {
+  PENDING: "text-yellow-400 animate-pulse",
+  ACCEPTED: "text-emerald-400",
+  REJECTED: "text-red-400/70",
+  CANCELLED: "text-slate-500",
+};
+
 function OfferRow({
   offer,
   isIncoming,
@@ -52,7 +59,9 @@ function OfferRow({
         <span className="font-semibold">
           {isIncoming ? offer.from_team_name : offer.to_team_name}
         </span>
-        <span className="text-xs text-slate-500">{STATUS_LABELS[offer.status]}</span>
+        <span className={`text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[offer.status] ?? "text-slate-500"}`}>
+          {STATUS_LABELS[offer.status]}
+        </span>
       </div>
       <div className="flex flex-wrap items-center gap-2 text-slate-300">
         <PlayerAvatar

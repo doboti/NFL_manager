@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Play, Settings, Trophy, X } from "lucide-react";
+import { Lock, Play, Settings, Trophy, X } from "lucide-react";
 import { Profile, changePassword, fetchProfile } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import PageTransition from "../components/PageTransition";
@@ -221,7 +221,10 @@ export default function ProfilePage() {
                       : "border-slate-800 bg-slate-900 text-slate-600"
                   }`}
                 >
-                  <div className="font-semibold">{a.name}</div>
+                  <div className="flex items-center justify-between gap-2 font-semibold">
+                    {a.name}
+                    {!a.earned && <Lock size={13} className="shrink-0 text-slate-600" />}
+                  </div>
                   <div className={a.earned ? "text-xs text-slate-300" : "text-xs text-slate-600"}>
                     {a.description}
                   </div>

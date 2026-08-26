@@ -223,7 +223,11 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                     </div>
                   )}
                   {isInjured && (
-                    <div className="mb-1 ml-1 inline-block rounded bg-red-950/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-300">
+                    <div className="mb-1 ml-1 inline-flex items-center gap-1 rounded bg-red-950/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-300">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-400" />
+                      </span>
                       Sérült
                     </div>
                   )}
@@ -254,7 +258,11 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                     </motion.button>
                   )}
                   {session && !ready && (
-                    <p className="rounded-lg bg-black/20 py-1.5 text-center text-xs font-medium">
+                    <p className="flex items-center justify-center gap-1.5 rounded-lg bg-black/20 py-1.5 text-center text-xs font-medium">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-team-primary opacity-75" />
+                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-team-primary" />
+                      </span>
                       Edzésben · hátra: <CountdownText target={session.ends_at} />
                     </p>
                   )}

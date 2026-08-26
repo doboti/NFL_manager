@@ -190,7 +190,11 @@ export default function LeagueTab({ team }: Props) {
                             .map((t) => (
                               <tr
                                 key={t.id}
-                                className={t.id === team.id ? "font-bold text-team-text" : "text-slate-300"}
+                                className={
+                                  t.id === team.id
+                                    ? "border-l-2 border-team-primary bg-team-primary/10 font-bold text-team-text"
+                                    : "text-slate-300"
+                                }
                               >
                                 <td className="py-0.5 truncate">
                                   <button
