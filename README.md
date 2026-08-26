@@ -50,7 +50,7 @@ frontend/
     components/      újrahasznosítható UI elemek (Sidebar, PlayerCard, MatchViewer, ui.tsx, Skeleton...)
     context/         React contextek (Auth, virtuális idő, csapatszín-téma)
     teamTheme.ts      csapatszín → CSS-változó/kontraszt segédfüggvények
-    playerTier.ts    OVR-alapú kártya-szintezés (arany/ezüst/bronz/sima)
+    playerTier.ts    OVR-alapú kártya-szintezés (elit/arany/ezüst/bronz/sima)
 docker-compose.yml
 ```
 
@@ -69,7 +69,7 @@ Két liga érhető el, teljesen független csapatokkal, ligatáblákkal, szezono
 - Ha a csapatot még senki (ember) nem választotta, de **AI bot vezeti**, a "kiválasztás" átveszi tőle a már működő, teljes rosterrel és eddigi állással rendelkező franchise-t (a bot-fiók törlődik).
 - Ha egy másik ember már lefoglalta, a választás elutasítva.
 - A csapat kezdéskor **csak a 3 legjobb overallú játékost kapja meg pozíciónként** (nem a teljes ~70-90 fős valódi rostert) — a többi a szabadügynök-piacon marad, onnan igazolható. Ez érvényes akkor is, ha egy már bot-irányított, feltöltött csapatot vesz át valaki.
-- Bármikor lecserélhető a csapat (`POST /teams/release`): a jelenlegi csapatot azonnal átveszi egy AI, a felhasználó pedig újra a `/select-team`-re kerül, bármelyik ligában választhat újat. A korábbi csapat szezon-történeti eredményei megmaradnak, a tulajdonostól függetlenül.
+- Bármikor lecserélhető a csapat (`POST /teams/release`): a jelenlegi csapatot azonnal átveszi egy AI, a felhasználó pedig újra a `/select-team`-re kerül, bármelyik ligában választhat újat. A menedzser saját karrier-adatai (szint, achievementek) ettől függetlenül megmaradnak — lásd lentebb.
 - Egy felhasználó jelenleg **egyszerre csak egyetlen csapatot** birtokolhat, bármelyik ligában (a Profil oldalon látható "liga-slot" rendszer az egyszerre több liga/csapat egyidejű menedzselésének előkészítése egy jövőbeli fázisban — ma a szint csak azt szabja meg, mikor jelenik meg a 2./3. slot mint koncepció, funkcionálisan még nincs kihasználva).
 
 ### 2. Menedzser profil, szint és achievementek
@@ -92,9 +92,8 @@ A meccsek **egy nappal előre generálódnak**, nem csak a lejátszás pillanat�
 
 1. lejátssza az aznapra kiírt, esedékes meccseket, frissíti a Gy-V-D állást, és (kis eséllyel) sérülést oszt a pályára lépő játékosok közül
 2. jóváírja a stadionbevételt (±10% RNG) és a szponzori kifizetéseket minden csapatnak
-3. feltölti a szabadügynök-piacot, ha a pool 15 alá csökkent
-4. **sorsolja a következő fordulót** minden csapatnak, akinek nincs még függő meccse
-5. elbírálja a bot-csapatoknak küldött függőben lévő csereajánlatokat
+3. **sorsolja a következő fordulót** minden csapatnak, akinek nincs még függő meccse
+4. elbírálja a bot-csapatoknak küldött függőben lévő csereajánlatokat
 
 Manuális/teszt trigger: `POST /matches/run-daily-cycle`. A saját következő meccs és ellenfél az Áttekintés fülön (`GET /matches/upcoming`) is látszik.
 
@@ -104,13 +103,18 @@ A liga valódi szezonokban játszik (`app/core/season_manager.py`, `GET /league/
 
 - **Alapszakasz**: 17 nap (`REGULAR_SEASON_DAYS`) — egy virtuális nap egy fordulónak felel meg, ahogy a valódi NFL 17 hetes szezonja.
 - **Rájátszás**: a 17. nap után minden divízió győztese (8 csapat, 4/konferencia) bekerül egy egyenes kieséses ágrajzba: konferencia-elődöntő → konferencia-döntő → **Super Bowl**. A résztvevők, konferenciabajnokok és a Super Bowl-győztes egyszeri pénzjutalmat kapnak (rendre 200 000 / 500 000 / 2 000 000 FT).
-- **Szezonváltás** (Super Bowl után, mindenre kiterjed, csapatonként, bot és ember egyaránt):
-  - minden csapat Gy-V-D-je nullázódik;
-  - minden játékos 1 évet öregszik, OVR-je visszaáll az eredeti (import-kori) `base_overall` értékre, XP-je nullázódik — **nincs nyugdíjazás/visszavonulás**, a liga állandó rostere megmarad, csak a szezon közben edzéssel megszerzett fejlődés vész el;
-  - minden csapat Franchise Tőkéje visszaáll az alap 1 000 000 FT-ra, a stadion szintje 1-re, és minden folyamatban lévő stadionfejlesztés törlődik — a gazdasági verseny minden szezonban tiszta lappal indul;
-  - **minden emberi tulajdonban lévő csapat visszakerül AI-irányítás alá**, a menedzser slotja felszabadul — a következő belépéskor újra a Profil oldalon landol, és bármelyik szabad csapatot választhatja (akár ugyanazt, akár egy másik ligában). Az elért eredmények (`SeasonHistory`, ezen keresztül az achievementek/szint) a menedzser személyéhez, nem a csapathoz köthetők, így ez nem veszik el.
+A liga **egyetlen, önmagában lezárt szezon** — nem folytatólagos, több szezonon átívelő dinasztia-mód. Szezonváltáskor (Super Bowl után, mindenre kiterjedően, csapatonként, bot és ember egyaránt) minden nullázódik, és a szezonszámláló is visszaáll **1-re** (sosem növekszik tovább):
 
-A Liga fülön mindig látszik az aktuális szezon, fázis és nap/forduló.
+- minden csapat Gy-V-D-je nullázódik;
+- minden csapat **kerete visszakerül a saját valódi NFL-/college-játékosaihoz** (`reset_all_rosters_to_real`) — a szezon közben lezajlott bot-cserék nyoma eltűnik, mindenki a saját, aktuális pontrendszer szerint újraértékelt depth chartjával indul;
+- minden játékos 1 évet öregszik; 30-32 évesen -1, 33+ évesen -2 pontot veszít a `base_overall`-jából (és a potenciáljából, ami sosem eshet a `base_overall` alá) — ez a valódi hanyatlás, ami miatt egy egykori sztár idővel tényleg lecserélendővé válik; az OVR ez után az (esetleg csökkent) `base_overall`-ra áll vissza, az XP nullázódik;
+- minden csapat Franchise Tőkéje visszaáll az alap 1 000 000 FT-ra, a stadion szintje 1-re, és minden folyamatban lévő stadionfejlesztés törlődik;
+- a **meccs-előzmény és minden csereajánlat törlődik** a ligából — ezek szezonon belüli részletek, nem maradnak meg a következő szezonra;
+- **minden emberi tulajdonban lévő csapat visszakerül AI-irányítás alá**, a menedzser slotja felszabadul — a következő belépéskor újra a Profil oldalon landol, és bármelyik szabad csapatot választhatja (akár ugyanazt, akár egy másik ligában).
+
+A menedzser saját karrierje (szint, achievementek — lásd lentebb) ettől **függetlenül, folyamatosan halmozódik**: ezek kizárólag a `SeasonHistory` rekordok számából és statisztikáiból számolódnak, sosem magából a liga aktuális szezonszámából, így minden egyes lejátszott (akár különböző csapatoknál eltöltött) szezon számít a karrierbe, még ha maga a liga mindig "1. szezonként" is indul újra.
+
+A Liga fülön mindig látszik az aktuális szezon (mindig 1-től induló), fázis és nap/forduló.
 
 ### 5. Kezdőcsapat kiválasztása
 
@@ -118,7 +122,18 @@ A Keret fülön kiválasztható, ki induljon a következő meccsen: 1 QB, 2 RB, 
 
 ### 6. Edzés (játékosfejlesztés)
 
-3 egyidejű edzésslot csapatonként, 18 órás edzésidő. XP-t ad, kor-szorzóval (18-21 év: 1.5x, 22-25: 1.0x, 26-29: 0.5x, 30+: 0.1x). `POST /training/start`, `POST /training/{id}/collect`. Sérült játékos nem küldhető edzésbe.
+3 egyidejű edzésslot csapatonként, 18 órás edzésidő. `POST /training/start`, `POST /training/{id}/collect`. Sérült játékos nem küldhető edzésbe.
+
+Minden játékosnak van egy egyéni **potenciálja** (`Player.potential`) — ez a valódi felső határ, amit edzéssel soha nem lehet átlépni. Az edzés az OVR-t ez alá a plafon alá fejleszti, nem lineárisan: minél közelebb van a játékos a saját potenciáljához, annál több edzés kell egy-egy pontért (`app/core/game_data.py: sessions_required_for_next_point`):
+
+| OVR sáv | edzés / +1 pont |
+|---|---|
+| 80 alatt | 1 |
+| 80-89 | 4 |
+| 90-94 | 10 |
+| 95+ | 25 |
+
+Ha egy játékos elérte a saját potenciálját, további edzés már nem emeli tovább az OVR-t (a session még lezajlik, csak nincs hatása). A potenciál generáláskor dől el (lásd "Valódi adatok"), és korfüggő "fejlődési tér" (headroom) alapján áll össze — egy fiatal, alacsony OVR-ű játékosnak sokkal nagyobb a saját plafonja, mint egy már beérkezett veteránnak.
 
 ### 7. Sérülések
 
@@ -146,14 +161,19 @@ Minden lejátszott meccs után mindkét csapat kezdő (a mérkőzésen ténylege
 
 ### 10. Piac és transzferek
 
-- **Szabadügynökök** (`GET /market/`): valódi játékosok, akiknek a csapatát még senki nem választotta. Szűrhető pozíció és név szerint, lapozva (`limit`/`offset`, a válasz `X-Total-Count` fejlécében a teljes találatszámmal — a Piac fülön "Előző/Következő oldal" gombokkal).
+- **Szabadügynökök** (`GET /market/`): valódi játékosok, akiknek a csapatát még senki nem választotta. Szűrhető pozíció és név szerint, lapozva (`limit`/`offset`, a válasz `X-Total-Count` fejlécében a teljes találatszámmal — a Piac fülön "Előző/Következő oldal" gombokkal). Alapértelmezett rendezés pozíció szerint csoportosítva (QB→RB→WR→TE→K→DEF), azon belül OVR szerint csökkenő — egy tisztán OVR-csökkenő lista mindig csak a teljes pool legjobbjait mutatná első oldalon, ami félrevezető lenne, hiszen a 90+ OVR-ű játékos szándékosan ritka (lásd "Valódi adatok").
 - **Elengedés** (`POST /roster/{id}/release`): saját játékos visszakerül szabadügynöknek.
-- **Transzferlista** (`POST /roster/{id}/list-for-transfer`): saját játékos eladásra kínálása egy általad megadott áron, más felhasználók megvehetik (`POST /transfers/{id}/buy`) — a bevétel közvetlenül hozzád kerül.
+- **Transzferlista** (`POST /roster/{id}/list-for-transfer`): saját játékos eladásra kínálása egy általad megadott áron, más felhasználók megvehetik (`POST /transfers/{id}/buy`) — a bevétel közvetlenül hozzád kerül. Csak a saját ligádon belüli ajánlatok látszanak/vásárolhatók (liga-szűrés mindkét irányban).
 - **Tárgyalások** (`/trades/*`): ajánlatot tehetsz bármelyik másik csapat (ember vagy bot) bármelyik játékosáért, böngészve a rosterüket (`GET /teams/{id}/roster`); készpénz és/vagy saját játékos cserébe. A célcsapat elfogadhatja/elutasíthatja; elfogadáskor minden más függőben lévő, ugyanazt a játékost érintő ajánlat automatikusan visszavonódik.
+- **Játékos kereső** (`GET /trades/search?name=...`): a Tárgyalások fülön névre kereshetsz bármelyik, a saját ligádban lévő játékóra (bármelyik csapatnál vagy szabadügynökként), és megmutatja, kinél van éppen és mennyi az OVR-je.
+
+Egy 99 OVR-ű, fiatal szabadügynök ára a kubikus alapgörbe fölött egy exponenciálisan növekvő "ritkasági felárral" is számol 80 OVR fölött (`app/core/game_data.py: player_market_value`) — egy valódi elit játékos ára a kezdő 1 000 000 FT-os büdzsé kb. felét emészti fel, nem pár százalékát, így egy induló csapat nem tud azonnal egy egész elit kezdőcsapatot összevásárolni.
 
 ### 11. Meccsszimuláció
 
 `app/core/simulation.py`: a kiválasztott (vagy automatikusan feltöltött) kezdőcsapat ereje pozíciónkénti súlyozott átlag-OVR-ként (QB/WR/RB/TE/K) áll szemben az ellenfél védelmi értékelésével — mindkettő ugyanazon a ~0-99-es skálán, hogy a különbség ténylegesen eldöntse a meccset, ne csak háttérzaj legyen. A várható pontszám egy alapérték + az erőkülönbség-alapú módosító, viszonylag alacsony szórással, így egy valódi minőségi különbség megbízhatóan meglátszik az eredményen (kiegyenlített csapatoknál ~50-50% eséllyel, nagy erőkülönbségnél 90%+ eséllyel nyer az esélyesebb), de a meglepetés esélye megmarad. A taktikai szorzók (Pass-heavy, Run-heavy, Blitz, Prevent) ezt tovább módosítják. `POST /matches/practice` egy azonnali gyakorlómeccshez generált AI-ellenféllel (nem befolyásolja a gazdaságot, nem kerül a liga-történetbe, sérülést sem okozhat).
+
+A következő meccs kártyán (Áttekintés fül) egy hozzávetőleges győzelmi esély is látszik: a két csapat átlag-OVR-je közti különbségből számolt Elo-szerű becslés (`Match.home_win_probability`) — ~10 pontos rosterkülönbség kb. 76%-os esélyt jelent, nem közelít a bizonyoshoz.
 
 ## AI bot-csapatok
 
@@ -169,7 +189,7 @@ Minden csapat, amit még nem választott ember, **AI-vezérelt bot** irányítja
 
 - **Dashboard-váz** (`components/Sidebar.tsx`): a bejelentkezés utáni felület egy állandó bal oldali menüsávval épül fel (ikon + felirat, animált csúszó jelölő az aktív fülön), amely mobilon hamburger-menüvé/kihúzható panellé alakul.
 - **Csapatszín-téma** (`teamTheme.ts`, `context/TeamThemeContext.tsx`): a Dashboard a birtokolt csapat valódi márkaszíneivel (`app/core/game_data.py: TEAM_COLORS`, mind a 64 NFL+college csapatra kézzel felvéve) tématizálódik — CSS-változóként befolyásolja a menüsáv kiemelését, a "saját csapat" jelöléseket (állás, sorsolás, rájátszás-ágrajz) és a fő gombokat. Egy kontraszt-védelem (`readableAccentHex`) gondoskodik róla, hogy egy nagyon sötét csapatszín (pl. fekete/sötétkék) is olvasható maradjon szövegként a sötét alapfelületen, miközben a tömör kitöltéseknél (gombok, aktív menüpont) a valódi márkaszín látszik.
-- **Sportkártya-dizájn** (`components/PlayerCard.tsx`, `playerTier.ts`): a játékosok OVR alapján arany (90+, csillogó animációval), ezüst (80-89), bronz (70-79) vagy sima sötét (70 alatt) kártyaként jelennek meg a piacon, a transzferlistán és a saját keretben — ez a szintezés szándékosan nem csapatszínezett, hogy a játékosminőség jelzése egyértelmű maradjon.
+- **Sportkártya-dizájn** (`components/PlayerCard.tsx`, `playerTier.ts`): a játékosok OVR alapján elit (95+, csillogó animációval), arany (90-94, csillogó animációval), ezüst (80-89), bronz (70-79) vagy sima sötét (70 alatt) kártyaként jelennek meg a piacon, a transzferlistán és a saját keretben — ez a szintezés szándékosan nem csapatszínezett, hogy a játékosminőség jelzése egyértelmű maradjon. A generálási reform óta (lásd "Valódi adatok") az elit/arany sáv valóban ritka is, nem csak vizuálisan van annak szánva.
 - **Animált meccsnéző** (`components/MatchViewer.tsx`): élő pontszám-számláló, negyedjelző, soronként megjelenő játéknapló, és berobbanó "TOUCHDOWN!" felirat izzó effekttel. Használva a gyakorlómeccsnél és a liga-meccsek visszajátszásánál (Meccsek fül, egy lejátszott meccsre kattintva).
 - **Skeleton loaderek** (`components/Skeleton.tsx`): pulzáló kártya-sziluettek "Betöltés..." szöveg helyett minden fülön és a kezdeti csapat-betöltésnél.
 
@@ -186,7 +206,7 @@ Az Admin konzolon (`app/core/clock.py`, `/admin/*` végpontok, csak `is_admin` f
 
 Az importált játékosnevek, korok és fejléc-fotó URL-ek forrása az ESPN nyilvános, de **nem hivatalosan licencelt** site API-ja. A backend csak a fotó URL-jét tárolja — a képfájlokat nem tölti le/hosztolja újra, a frontend közvetlenül az ESPN CDN-jéről tölti be őket. Ez a projekt **kizárólag személyes, nem kereskedelmi célra** használja ezt az adatot; nyilvános közzététel/kereskedelmi használat esetén liga/szövetségi licenc kellene hozzá. A csapatszínek (`TEAM_COLORS`) kézzel felvitt, közismert márkaszín-párok, szintén nem hivatalos forrásból.
 
-Az OVR-értékelés **nincs** a forrásadatban — azt a játék generálja (`app/scripts/import_nfl_players.py: generate_overall`), enyhén a valós tapasztalat (szezonok száma / college osztályév) alapján súlyozva, de nem valódi képességmérés.
+Az OVR-értékelés **nincs** a forrásadatban — azt a játék generálja, rangsor-alapú módszerrel (`app/scripts/import_nfl_players.py` / `import_college_players.py: rate_candidates`), nem véletlenszerű "elit-dobással". Minden pozíciócsoporton belül (QB/RB/WR/TE/K/DEF) a játékosok depth chart-pozíció + tapasztalat alapján sorba rendeződnek, majd a rangsorbeli percentilis egy fix görbén keresztül képződik le OVR-értékké — ez garantálja a célzott eloszlást (a szabadügynökök kb. 90%-a 60-75 közé esik, 90+ csak a legjobb ~1%), nem csak valószínűségileg közelíti azt. Emellett egy külön jel — ESPN nyilvános statisztikai toplistái (`sports.core.api.espn.com/.../leaders`, passzolt/futott/elkapott yardok, touchdownok, tackle-ök stb. top 25-je kategóriánként) — pluszpontot ad a rangsorban azoknak, akik ténylegesen a legjobb valós szezon-statisztikákkal rendelkeznek, hogy egy valódi liga-vezető NE végezze a mezőny alján pusztán azért, mert a depth chart-jel önmagában nem tud különbséget tenni "jó kezdőjátékos" és "kiemelkedő kezdőjátékos" között.
 
 ## Dev szkriptek
 
@@ -208,6 +228,11 @@ docker compose exec backend python -m app.scripts.seed_bot_teams
 # automatikusan létrehozza a bot-csapatokat) megelőzte a fenti import szkriptek lefutását.
 # Csak az üres csapatokat érinti, semmit nem töröl -- élő szerveren is biztonságos.
 docker compose exec backend python -m app.scripts.backfill_missing_rosters
+
+# Javítófuttatás: potenciál-plafont ad minden olyan játékosnak, akinek még nincs
+# (a `Player.potential` oszlop bevezetése előtti sorok) -- a jelenlegi OVR/kor
+# alapján, sosem a jelenlegi OVR alá. Csak a hiányzó sorokat érinti, biztonságos.
+docker compose exec backend python -m app.scripts.backfill_potential
 
 # Töröl minden felhasználót, csapatot és a hozzájuk tartozó adatot (edzés, szponzor,
 # stadion-fejlesztés, meccs, csereajánlat), majd újra feltölti a ligát AI-botokkal.
