@@ -15,12 +15,12 @@ export function Card({ children, className = "", highlight = false, dashed = fal
     <motion.div
       whileHover={{ y: -2 }}
       transition={{ duration: 0.18, ease: "easeOut" }}
-      className={`rounded-xl p-4 shadow-sm transition-colors ${
+      className={`relative rounded-xl p-4 backdrop-blur-xl transition-colors shadow-[0_1px_3px_0_rgba(0,0,0,0.3),inset_0_1px_0_0_rgba(255,255,255,0.06)] ${
         dashed
-          ? "border border-dashed border-slate-700 bg-slate-900/50"
+          ? "border border-dashed border-slate-600/60 bg-slate-900/30"
           : highlight
           ? "border border-team-primary/50 bg-team-primary/10"
-          : "border border-slate-800/80 bg-slate-900/70"
+          : "border border-white/10 bg-slate-900/40"
       } ${className}`}
     >
       {children}
@@ -37,7 +37,7 @@ export function PrimaryButton({ children, className = "", style, ...rest }: Prim
       whileHover={{ scale: 1.03 }}
       whileTap={{ scale: 0.96 }}
       style={{ color: contrastOnPrimary, ...style }}
-      className={`rounded-lg bg-team-primary px-4 py-2 text-sm font-semibold shadow-sm transition hover:brightness-110 disabled:opacity-40 ${className}`}
+      className={`rounded-lg bg-team-primary px-4 py-2 text-sm font-semibold shadow-[0_0_16px_2px_rgb(var(--team-primary-rgb)/0.35)] transition hover:brightness-110 hover:shadow-[0_0_22px_4px_rgb(var(--team-primary-rgb)/0.5)] disabled:opacity-40 disabled:shadow-none ${className}`}
       {...rest}
     >
       {children}

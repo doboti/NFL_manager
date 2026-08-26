@@ -3,6 +3,11 @@ export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        // Numeric/stat readouts (money, OVR, capacity, level) -- a more
+        // "instrument panel" feel than the default sans for plain prose.
+        stat: ["'Space Grotesk'", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
       colors: {
         gridiron: {
           field: "#0f2e1e",

@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Landmark, Repeat, Swords } from "lucide-react";
+import {
+  Building2,
+  Dice5,
+  Landmark,
+  LucideIcon,
+  Repeat,
+  ShieldCheck,
+  Store,
+  Swords,
+  TrendingUp,
+  Zap,
+} from "lucide-react";
 import {
   ScheduledMatch,
   Sponsor,
@@ -29,6 +40,14 @@ interface Props {
   team: Team;
   onTeamUpdate: (team: Team) => void;
 }
+
+const SPONSOR_ICONS: Record<string, LucideIcon> = {
+  steady: ShieldCheck,
+  performance: TrendingUp,
+  high_risk: Dice5,
+  short_term: Zap,
+  local_business: Store,
+};
 
 export default function OverviewTab({ team, onTeamUpdate }: Props) {
   const [upgrade, setUpgrade] = useState<StadiumUpgrade | null>(null);
@@ -141,9 +160,29 @@ export default function OverviewTab({ team, onTeamUpdate }: Props) {
                 Fejlesztés átvétele (szint {upgrade.target_level})
               </PrimaryButton>
             ) : (
-              <p className="text-sm text-slate-400">
-                Fejlesztés {upgrade.target_level}. szintre · hátra: <CountdownText target={upgrade.ends_at} />
-              </p>
+              <>
+                <p className="mb-2 text-sm text-slate-400">
+                  Fejlesztés {upgrade.target_level}. szintre · hátra: <CountdownText target={upgrade.ends_at} />
+                </p>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-black/30">
+                  <motion.div
+                    className="h-2 rounded-full bg-team-primary"
+                    initial={false}
+                    animate={{
+                      width: `${Math.min(
+                        100,
+                        Math.max(
+                          2,
+                          ((virtualNow() - new Date(upgrade.started_at).getTime()) /
+                            (new Date(upgrade.ends_at).getTime() - new Date(upgrade.started_at).getTime())) *
+                            100
+                        )
+                      )}%`,
+                    }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                  />
+                </div>
+              </>
             )
           ) : nextStadium ? (
             <>
@@ -193,32 +232,52 @@ export default function OverviewTab({ team, onTeamUpdate }: Props) {
 
       <SectionHeading icon={Landmark}>Szponzorok ({sponsors.length}/3)</SectionHeading>
       <div className="mb-8 grid gap-3 sm:grid-cols-2">
-        {sponsors.map((s, i) => (
-          <motion.div
-            key={s.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-          >
-            <Card className="text-sm">
-              <div className="font-semibold">{s.name}</div>
-              <div className="text-slate-400">
-                {s.daily_amount.toLocaleString("hu-HU")} FT/nap
-                {s.win_bonus > 0 && ` + ${s.win_bonus.toLocaleString("hu-HU")} FT győzelmi bónusz`}
-              </div>
-              <div className="text-slate-500">
-                Lejár: <CountdownText target={s.expires_at} />
-              </div>
-            </Card>
-          </motion.div>
-        ))}
+        {sponsors.map((s, i) => {
+          const Icon = SPONSOR_ICONS[s.template_key] ?? Landmark;
+          return (
+            <motion.div
+              key={s.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+            >
+              <Card className="text-sm">
+                <div className="mb-1 flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Icon size={15} className="text-team-text" />
+                    {s.name}
+                  </div>
+                  <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-emerald-400">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    </span>
+                    Aktív
+                  </span>
+                </div>
+                <div className="font-stat text-slate-400">
+                  {s.daily_amount.toLocaleString("hu-HU")} FT/nap
+                  {s.win_bonus > 0 && ` + ${s.win_bonus.toLocaleString("hu-HU")} FT győzelmi bónusz`}
+                </div>
+                <div className="text-slate-500">
+                  Lejár: <CountdownText target={s.expires_at} />
+                </div>
+              </Card>
+            </motion.div>
+          );
+        })}
         {sponsors.length < 3 &&
           templates
             .filter((t) => !signedKeys.has(t.key))
-            .map((t) => (
+            .map((t) => {
+              const Icon = SPONSOR_ICONS[t.key] ?? Landmark;
+              return (
               <Card key={t.key} dashed className="text-sm">
-                <div className="font-semibold">{t.name}</div>
-                <div className="text-slate-400">
+                <div className="mb-1 flex items-center gap-2 font-semibold">
+                  <Icon size={15} className="text-slate-400" />
+                  {t.name}
+                </div>
+                <div className="font-stat text-slate-400">
                   {t.daily_amount.toLocaleString("hu-HU")} FT/nap
                   {t.win_bonus > 0 && ` + ${t.win_bonus.toLocaleString("hu-HU")} FT győzelmi bónusz`}
                 </div>
@@ -236,7 +295,8 @@ export default function OverviewTab({ team, onTeamUpdate }: Props) {
                   Aláírás
                 </PrimaryButton>
               </Card>
-            ))}
+              );
+            })}
       </div>
 
       <div className="rounded-lg border border-red-900/40 bg-red-950/10 p-4">

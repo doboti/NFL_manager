@@ -32,13 +32,18 @@ export default function PlayerCard({ player, index = 0, footer, subtitle }: Prop
       )}
 
       <div className="relative flex items-start justify-between">
-        <div className={`text-3xl font-black leading-none tracking-tight ${style.ovr}`}>{player.overall}</div>
+        <div className={`font-stat text-3xl font-bold leading-none tracking-tight ${style.ovr}`}>{player.overall}</div>
         <span className="rounded bg-black/25 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
           {player.position}
         </span>
       </div>
 
       <div className="relative my-2 flex justify-center">
+        <div
+          className="absolute h-16 w-16 rounded-full blur-xl"
+          style={{ backgroundColor: style.glow }}
+          aria-hidden
+        />
         <PlayerAvatar firstName={player.first_name} lastName={player.last_name} photoUrl={player.photo_url} size={72} />
       </div>
 
@@ -46,7 +51,7 @@ export default function PlayerCard({ player, index = 0, footer, subtitle }: Prop
         <div className="truncate text-sm font-bold">
           {player.first_name} {player.last_name}
         </div>
-        <div className={`text-xs ${style.meta}`}>
+        <div className={`font-stat text-xs ${style.meta}`}>
           {player.age} éves{player.nfl_team && ` · ${player.nfl_team}`}
         </div>
         {subtitle}
