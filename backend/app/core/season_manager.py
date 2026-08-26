@@ -20,6 +20,7 @@ from app.models.player import Player
 from app.models.season_history import SeasonHistory
 from app.models.stadium_upgrade import StadiumUpgrade
 from app.models.team import Team
+from app.models.trade_offer import TradeOffer
 
 _PLAYOFF_ROUND_ORDER = ["conference_semifinal", "conference_final", "super_bowl"]
 
@@ -272,6 +273,20 @@ def _record_season_history(db: Session, league: League, champion_id: int) -> Non
 
 def end_season(db: Session, league: League, now: datetime, champion_id: int) -> dict:
     _record_season_history(db, league, champion_id)
+
+    # Match results and trade-offer history are in-season detail --
+    # SeasonHistory (just recorded above) is the permanent summary that
+    # survives. Without this, both kept accumulating across seasons
+    # indefinitely (unlike economy/ratings/roster, which already reset
+    # cleanly every season), so a freshly-reset team still showed match
+    # history and accepted trade offers referencing players who'd already
+    # been sent back to their real teams by reset_all_rosters_to_real().
+    team_ids = [t for (t,) in db.query(Team.id).filter(Team.league_id == league.id).all()]
+    if team_ids:
+        db.query(TradeOffer).filter(
+            (TradeOffer.from_team_id.in_(team_ids)) | (TradeOffer.to_team_id.in_(team_ids))
+        ).delete(synchronize_session=False)
+    db.query(Match).filter(Match.league_id == league.id).delete(synchronize_session=False)
 
     # A manager's tenure with a team lasts exactly one season; once it's
     # over everyone goes back to AI control so the freed-up slot can be
