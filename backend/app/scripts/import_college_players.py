@@ -158,17 +158,26 @@ def import_players(db: Session) -> dict:
                 else:
                     existing.photo_url = headshot
                     existing.nfl_team = code
+                    new_overall, new_potential = generate_ratings(class_years, depth_index)
                     if existing.team_id is None:
                         # Free agents have no training investment to lose --
-                        # safe to re-rate with the improved formula (#19/#20)
-                        # on every re-run, instead of being stuck with
-                        # whatever the old random roll gave them.
-                        overall, potential = generate_ratings(class_years, depth_index)
-                        existing.overall = overall
-                        existing.base_overall = overall
-                        existing.potential = potential
+                        # safe to fully re-rate with the improved formula
+                        # (#19/#20) on every re-run, instead of being stuck
+                        # with whatever the old random roll gave them.
+                        existing.overall = new_overall
+                        existing.base_overall = new_overall
+                        existing.potential = new_potential
                         existing.market_price = max(
-                            1, round(player_market_value(BASE_MARKET_PRICE, overall, existing.age))
+                            1, round(player_market_value(BASE_MARKET_PRICE, new_overall, existing.age))
+                        )
+                    else:
+                        # Owned players may have live training progress on
+                        # `overall` -- only refresh the season-reset target
+                        # and ceiling, same reasoning as the NFL import.
+                        existing.base_overall = new_overall
+                        existing.potential = new_potential
+                        existing.market_price = max(
+                            1, round(player_market_value(BASE_MARKET_PRICE, existing.overall, existing.age))
                         )
                     updated += 1
 

@@ -180,16 +180,31 @@ def import_players(db: Session) -> dict:
                     existing.age = age
                     existing.photo_url = headshot
                     existing.nfl_team = abbreviation
+                    new_overall, new_potential = generate_ratings(experience_years, depth_index, age)
                     if existing.team_id is None:
                         # Free agents have no training investment to lose --
-                        # safe to re-rate with the improved formula (#19/#20)
-                        # on every re-run, instead of being stuck with
-                        # whatever the old random roll gave them.
-                        overall, potential = generate_ratings(experience_years, depth_index, age)
-                        existing.overall = overall
-                        existing.base_overall = overall
-                        existing.potential = potential
-                        existing.market_price = max(1, round(player_market_value(BASE_MARKET_PRICE, overall, age)))
+                        # safe to fully re-rate with the improved formula
+                        # (#19/#20) on every re-run, instead of being stuck
+                        # with whatever the old random roll gave them.
+                        existing.overall = new_overall
+                        existing.base_overall = new_overall
+                        existing.potential = new_potential
+                        existing.market_price = max(
+                            1, round(player_market_value(BASE_MARKET_PRICE, new_overall, age))
+                        )
+                    else:
+                        # Owned players may have live training progress on
+                        # `overall` -- only refresh the season-reset target
+                        # and ceiling, so a corrected (previously stale,
+                        # pre-#19/#20) baseline takes effect naturally at the
+                        # next season_manager.reset_player_ratings() instead
+                        # of yanking a manager's current-season gains out
+                        # from under them mid-season.
+                        existing.base_overall = new_overall
+                        existing.potential = new_potential
+                        existing.market_price = max(
+                            1, round(player_market_value(BASE_MARKET_PRICE, existing.overall, age))
+                        )
                     updated += 1
 
         db.commit()

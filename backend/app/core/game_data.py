@@ -328,4 +328,13 @@ def player_daily_salary(overall: int) -> int:
 
 
 def player_market_value(base_price: float, ovr: int, age: int) -> float:
-    return base_price * (ovr / 50) ** 3 * (35 - age)
+    """Cubic base curve, same as before, plus a compounding rarity premium
+    above 80 OVR (#20 follow-up) -- without it a 99 OVR player cost about
+    10% of the 1,000,000 starting budget, cheap enough to buy an entire
+    elite roster on day one even though the generation formula makes 90+ a
+    genuine rarity. At 8% per point above 80, a 99 OVR player now runs
+    roughly half the starting budget -- a real splurge, not pocket change."""
+    value = base_price * (ovr / 50) ** 3
+    if ovr > 80:
+        value *= 1.08 ** (ovr - 80)
+    return value * (35 - age)
