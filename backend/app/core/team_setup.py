@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.game_data import player_market_value
 from app.core.security import hash_password
 from app.models.enums import Position
 from app.models.league import League
@@ -73,6 +74,33 @@ def assign_real_roster(db: Session, team: Team, code: str, league_id: int) -> in
     db.flush()
     _cap_roster_to_top_by_position(db, team)
     return len(team.players)
+
+
+def reset_all_rosters_to_real(db: Session, league: League) -> int:
+    """Called once per season transition, the same moment
+    season_manager.reset_team_economy() and reset_player_ratings() run --
+    without this, roster composition was the one thing that never reset:
+    economy/record wiped clean every season while bot-to-bot trades kept
+    accumulating indefinitely, so a freshly-claimed team looked half brand
+    new (0-0-0, starting capital) and half several-seasons-stale (a roster
+    shaped by trade history, not the team's real depth chart). Frees every
+    owned player in the league back to the pool, then re-assigns each team
+    from scratch via assign_real_roster -- same as a first-time claim."""
+    owned_players = db.query(Player).filter(Player.league_id == league.id, Player.team_id.isnot(None)).all()
+    for player in owned_players:
+        player.team_id = None
+        player.listed_for_transfer = False
+        player.asking_price = None
+        player.market_price = max(1, round(player_market_value(1000, player.overall, player.age)))
+    db.flush()
+
+    teams = db.query(Team).filter(Team.league_id == league.id).all()
+    reassigned = 0
+    for team in teams:
+        if team.nfl_team_code:
+            assign_real_roster(db, team, team.nfl_team_code, league.id)
+            reassigned += 1
+    return reassigned
 
 
 def claim_team(db: Session, user: User, league: League, code: str, team_name: str) -> Team:

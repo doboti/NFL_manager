@@ -12,7 +12,7 @@ from app.core.game_data import (
 )
 from app.core.config import settings
 from app.core.schedule import LEAGUE_TZ
-from app.core.team_setup import release_all_human_teams
+from app.core.team_setup import release_all_human_teams, reset_all_rosters_to_real
 from app.models.enums import SeasonPhase
 from app.models.league import League
 from app.models.match import Match
@@ -279,6 +279,7 @@ def end_season(db: Session, league: League, now: datetime, champion_id: int) -> 
     released_managers = release_all_human_teams(db, league)
 
     aging_result = reset_player_ratings(db, league)
+    reset_all_rosters_to_real(db, league)
     reset_team_economy(db, league)
 
     for team in db.query(Team).filter(Team.league_id == league.id).all():
