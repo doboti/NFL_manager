@@ -69,13 +69,20 @@ def fetch_roster(team_id: str) -> dict:
     return resp.json()
 
 
-def generate_overall(experience_years: int) -> int:
-    """No real rating exists in the source data; synthesize a plausible one."""
-    base = random.randint(52, 80)
-    veteran_bonus = min(experience_years, 10) * random.uniform(0.5, 1.5)
-    if random.random() > 0.93:
-        base += random.randint(10, 18)
-    return max(40, min(99, round(base + veteran_bonus)))
+def generate_overall(experience_years: int, depth_index: int) -> int:
+    """No real rating exists in the source data, but ESPN's roster listing
+    order within a position is a real signal (`depth_index` -- 0 is the
+    player ESPN lists first at that spot, almost always the starter), and so
+    is real career length. Weighting those instead of leaning on a wide
+    random band (and a flat lucky-roll bonus, previously a 7% chance at
+    +10-18 regardless of who the player was) fixes #19: a longtime starter
+    can now genuinely reach elite territory, while a random depth-chart
+    afterthought can't roll into it by luck."""
+    base = 60.0
+    experience_component = min(experience_years, 14) * 2.2
+    depth_component = (4 - min(depth_index, 12)) * 2.5
+    noise = random.uniform(-4, 4)
+    return max(40, min(99, round(base + experience_component + depth_component + noise)))
 
 
 def import_players(db: Session) -> dict:
@@ -91,6 +98,7 @@ def import_players(db: Session) -> dict:
         print(f"Importing roster: {team['displayName']} ({abbreviation})")
 
         roster = fetch_roster(team_id)
+        position_depth: dict[Position, int] = {}
         for group in roster.get("athletes", []):
             if group.get("position") not in ACTIVE_GROUPS:
                 continue
@@ -101,6 +109,12 @@ def import_players(db: Session) -> dict:
                 if position is None:
                     skipped += 1
                     continue
+
+                # ESPN lists each position group in depth-chart order --
+                # index 0 is (almost always) the starter. Real signal for
+                # generate_overall(), see its docstring.
+                depth_index = position_depth.get(position, 0)
+                position_depth[position] = depth_index + 1
 
                 espn_id = athlete["id"]
                 display_name = athlete.get("displayName", "")
@@ -113,7 +127,7 @@ def import_players(db: Session) -> dict:
                 existing = db.query(Player).filter(Player.espn_id == espn_id).first()
 
                 if existing is None:
-                    overall = generate_overall(experience_years)
+                    overall = generate_overall(experience_years, depth_index)
                     player = Player(
                         team_id=None,
                         league_id=league.id,
@@ -135,9 +149,14 @@ def import_players(db: Session) -> dict:
                     existing.photo_url = headshot
                     existing.nfl_team = abbreviation
                     if existing.team_id is None:
-                        existing.market_price = max(
-                            1, round(player_market_value(BASE_MARKET_PRICE, existing.overall, age))
-                        )
+                        # Free agents have no training investment to lose --
+                        # safe to re-rate with the improved formula (#19) on
+                        # every re-run, instead of being stuck with whatever
+                        # the old random roll gave them at first import.
+                        overall = generate_overall(experience_years, depth_index)
+                        existing.overall = overall
+                        existing.base_overall = overall
+                        existing.market_price = max(1, round(player_market_value(BASE_MARKET_PRICE, overall, age)))
                     updated += 1
 
         db.commit()

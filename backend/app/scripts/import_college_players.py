@@ -65,14 +65,18 @@ def fetch_roster(espn_team_id: str) -> dict:
     return resp.json()
 
 
-def generate_overall(class_years: int) -> int:
-    """No real rating exists in the source data; synthesize a plausible one,
-    nudged up for upperclassmen the same way the NFL import nudges veterans."""
-    base = random.randint(48, 74)
-    class_bonus = min(class_years, 5) * random.uniform(1.0, 2.5)
-    if random.random() > 0.95:
-        base += random.randint(8, 15)
-    return max(38, min(95, round(base + class_bonus)))
+def generate_overall(class_years: int, depth_index: int) -> int:
+    """No real rating exists in the source data, but ESPN's roster listing
+    order within a position is a real signal (`depth_index` -- 0 is the
+    player ESPN lists first, almost always the starter), same as the NFL
+    import now uses (see its generate_overall docstring, issue #19) --
+    class year plus depth chart position instead of a wide random band with
+    a flat lucky-roll bonus regardless of who the player actually is."""
+    base = 55.0
+    class_component = min(class_years, 5) * 4.5
+    depth_component = (4 - min(depth_index, 12)) * 2.5
+    noise = random.uniform(-4, 4)
+    return max(38, min(95, round(base + class_component + depth_component + noise)))
 
 
 def import_players(db: Session) -> dict:
@@ -86,6 +90,7 @@ def import_players(db: Session) -> dict:
         print(f"Importing roster: {team['name']} ({code})")
 
         roster = fetch_roster(team["espn_id"])
+        position_depth: dict[Position, int] = {}
         for group in roster.get("athletes", []):
             if group.get("position") not in ACTIVE_GROUPS:
                 continue
@@ -96,6 +101,9 @@ def import_players(db: Session) -> dict:
                 if position is None:
                     skipped += 1
                     continue
+
+                depth_index = position_depth.get(position, 0)
+                position_depth[position] = depth_index + 1
 
                 espn_id = athlete["id"]
                 display_name = athlete.get("displayName", "")
@@ -108,7 +116,7 @@ def import_players(db: Session) -> dict:
                 existing = db.query(Player).filter(Player.espn_id == espn_id).first()
 
                 if existing is None:
-                    overall = generate_overall(class_years)
+                    overall = generate_overall(class_years, depth_index)
                     player = Player(
                         team_id=None,
                         league_id=league.id,
@@ -129,8 +137,15 @@ def import_players(db: Session) -> dict:
                     existing.photo_url = headshot
                     existing.nfl_team = code
                     if existing.team_id is None:
+                        # Free agents have no training investment to lose --
+                        # safe to re-rate with the improved formula (#19) on
+                        # every re-run, instead of being stuck with whatever
+                        # the old random roll gave them at first import.
+                        overall = generate_overall(class_years, depth_index)
+                        existing.overall = overall
+                        existing.base_overall = overall
                         existing.market_price = max(
-                            1, round(player_market_value(BASE_MARKET_PRICE, existing.overall, existing.age))
+                            1, round(player_market_value(BASE_MARKET_PRICE, overall, existing.age))
                         )
                     updated += 1
 
