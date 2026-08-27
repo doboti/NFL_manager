@@ -370,6 +370,10 @@ export async function collectTraining(sessionId: number) {
   return data;
 }
 
+export async function cancelTraining(sessionId: number) {
+  await apiClient.post(`/training/${sessionId}/cancel`);
+}
+
 // --- sponsors ---
 
 export async function listSponsors() {

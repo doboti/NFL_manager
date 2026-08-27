@@ -62,6 +62,25 @@ def start_training(db: Session, team_id: int, player_id: int) -> TrainingSession
     return session
 
 
+def cancel_training(db: Session, team_id: int, session_id: int) -> None:
+    """Stops a training session before it's collected -- no partial credit,
+    the banked xp for this session is simply discarded, but it immediately
+    frees the slot so the manager can start training someone else instead."""
+    session = (
+        db.query(TrainingSession)
+        .join(Player, Player.id == TrainingSession.player_id)
+        .filter(TrainingSession.id == session_id, Player.team_id == team_id)
+        .first()
+    )
+    if session is None:
+        raise TrainingError("Training session not found")
+    if session.collected:
+        raise TrainingError("Training already collected")
+
+    db.delete(session)
+    db.commit()
+
+
 def collect_training(db: Session, team_id: int, session_id: int) -> TrainingSession:
     session = (
         db.query(TrainingSession)

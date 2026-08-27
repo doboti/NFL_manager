@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.deps import get_current_user, resolve_active_team
-from app.core.training import TrainingError, collect_training, start_training
+from app.core.training import TrainingError, cancel_training, collect_training, start_training
 from app.models.player import Player
 from app.models.team import Team
 from app.models.training import TrainingSession
@@ -53,5 +53,18 @@ def collect(
     team_id = _get_team_id(current_user, db)
     try:
         return collect_training(db, team_id, session_id)
+    except TrainingError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/{session_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
+def cancel(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    team_id = _get_team_id(current_user, db)
+    try:
+        cancel_training(db, team_id, session_id)
     except TrainingError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

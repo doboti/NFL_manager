@@ -5,6 +5,7 @@ import {
   Player,
   Team,
   TrainingSession,
+  cancelTraining,
   collectTraining,
   fetchMyTeam,
   listPlayerForTransfer,
@@ -270,13 +271,33 @@ export default function RosterTab({ team, onTeamUpdate }: Props) {
                     </motion.button>
                   )}
                   {session && !ready && (
-                    <p className="flex items-center justify-center gap-1.5 rounded-lg bg-black/20 py-1.5 text-center text-xs font-medium">
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-team-primary opacity-75" />
-                        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-team-primary" />
-                      </span>
-                      Edzésben · hátra: <CountdownText target={session.ends_at} />
-                    </p>
+                    <>
+                      <p className="flex items-center justify-center gap-1.5 rounded-lg bg-black/20 py-1.5 text-center text-xs font-medium">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-team-primary opacity-75" />
+                          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-team-primary" />
+                        </span>
+                        Edzésben · hátra: <CountdownText target={session.ends_at} />
+                      </p>
+                      <button
+                        disabled={busy === `cancel-${player.id}`}
+                        onClick={() =>
+                          withBusy(`cancel-${player.id}`, async () => {
+                            if (
+                              !window.confirm(
+                                `Biztosan leállítod ${player.first_name} ${player.last_name} edzését? Az eddigi fejlődése nem fog befejeződni, elvész.`
+                              )
+                            )
+                              return;
+                            await cancelTraining(session.id);
+                            setTraining(await listTraining());
+                          })
+                        }
+                        className="w-full rounded-lg bg-black/20 py-1 text-[11px] font-semibold hover:bg-red-950/60 hover:text-red-300 disabled:opacity-30"
+                      >
+                        Edzés leállítása
+                      </button>
+                    </>
                   )}
                   {session && ready && (
                     <PrimaryButton
