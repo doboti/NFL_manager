@@ -3,7 +3,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, resolve_active_team
 from app.core.trades import TradeError, accept_offer, cancel_offer, create_offer, reject_offer
 from app.models.player import Player
 from app.models.team import Team
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/trades", tags=["trades"])
 
 
 def _get_team(current_user: User, db: Session) -> Team:
-    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    team = resolve_active_team(db, current_user)
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
     return team

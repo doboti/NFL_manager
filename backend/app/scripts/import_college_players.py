@@ -25,6 +25,7 @@ from app.core.clock import get_or_create_league
 from app.core.database import SessionLocal
 from app.core.game_data import COLLEGE_OVR_PERCENTILE_CURVE, COLLEGE_TEAMS, overall_from_percentile, player_market_value
 from app.models.enums import Position
+from app.models.league import League
 from app.models.player import Player
 
 ROSTER_URL = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/teams/{team_id}/roster"
@@ -155,8 +156,12 @@ def rate_candidates(candidates: list[Candidate], leader_bonuses: dict[str, int])
             c.potential = min(cap, c.overall + headroom)
 
 
-def import_players(db: Session) -> dict:
-    league = get_or_create_league(db, "college")
+def import_players(db: Session, league: League | None = None) -> dict:
+    """`league` defaults to the original single college instance for
+    backward compatibility -- see import_nfl_players.import_players()'s
+    equivalent docstring."""
+    if league is None:
+        league = get_or_create_league(db, "college")
     skipped = 0
     candidates: list[Candidate] = []
     seen_espn_ids: set[str] = set()
@@ -195,7 +200,11 @@ def import_players(db: Session) -> dict:
                 class_years = (athlete.get("experience") or {}).get("years", 1)
                 headshot = (athlete.get("headshot") or {}).get("href")
 
-                existing = db.query(Player).filter(Player.espn_id == espn_id).first()
+                existing = (
+                    db.query(Player)
+                    .filter(Player.espn_id == espn_id, Player.league_id == league.id)
+                    .first()
+                )
                 candidates.append(
                     Candidate(
                         espn_id=espn_id,

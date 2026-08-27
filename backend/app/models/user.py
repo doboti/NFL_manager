@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -17,4 +17,12 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
-    team: Mapped["Team | None"] = relationship(back_populates="owner", uselist=False, cascade="all, delete-orphan")
+    # A user can now own up to 3 teams at once (one per league instance,
+    # gated by core/progression.py's slot unlocks) -- active_team_id is
+    # which one every single-team-scoped endpoint currently resolves "my
+    # team" through (core/deps.py: get_active_team).
+    active_team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True)
+
+    teams: Mapped[list["Team"]] = relationship(
+        back_populates="owner", foreign_keys="Team.owner_id", cascade="all, delete-orphan"
+    )

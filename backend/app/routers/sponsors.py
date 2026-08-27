@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.clock import now_utc
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, resolve_active_team
 from app.core.game_data import MAX_ACTIVE_SPONSORS, SPONSOR_TEMPLATES, SPONSOR_TEMPLATES_BY_KEY
 from app.models.enums import SponsorType
 from app.models.sponsor import Sponsor
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/sponsors", tags=["sponsors"])
 
 
 def _get_team(current_user: User, db: Session) -> Team:
-    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    team = resolve_active_team(db, current_user)
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
     return team

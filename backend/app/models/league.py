@@ -12,6 +12,11 @@ class League(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     key: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    # The sport/config-type this instance belongs to ("nfl"/"college" -- the
+    # key into game_data.LEAGUES), distinct from `key` which is now a
+    # per-instance slug ("nfl", "nfl-2", "nfl-3", ...) since multiple
+    # concurrent instances of the same sport can exist.
+    sport: Mapped[str] = mapped_column(String(30), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     season: Mapped[int] = mapped_column(default=1)
 

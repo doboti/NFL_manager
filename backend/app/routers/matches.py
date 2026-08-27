@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.daily_cycle import run_daily_cycle
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, resolve_active_team
 from app.core.player_generator import generate_starting_roster, random_name
 from app.core.simulation import simulate_match
 from app.models.match import Match
@@ -17,12 +17,7 @@ router = APIRouter(prefix="/matches", tags=["matches"])
 
 
 def _get_team(current_user: User, db: Session) -> Team:
-    team = (
-        db.query(Team)
-        .options(joinedload(Team.players))
-        .filter(Team.owner_id == current_user.id)
-        .first()
-    )
+    team = resolve_active_team(db, current_user)
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
     return team

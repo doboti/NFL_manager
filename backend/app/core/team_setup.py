@@ -4,10 +4,12 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.game_data import player_market_value
+from app.core.progression import compute_level, unlocked_slots
 from app.core.security import hash_password
 from app.models.enums import Position
 from app.models.league import League
 from app.models.player import Player
+from app.models.season_history import SeasonHistory
 from app.models.team import Team
 from app.models.user import User
 
@@ -103,11 +105,27 @@ def reset_all_rosters_to_real(db: Session, league: League) -> int:
     return reassigned
 
 
+def _owned_team_count(db: Session, user: User) -> int:
+    return db.query(Team).filter(Team.owner_id == user.id).count()
+
+
+def _user_level(db: Session, user: User) -> int:
+    completed_seasons = db.query(SeasonHistory).filter(SeasonHistory.owner_id == user.id).count()
+    return compute_level(completed_seasons)
+
+
 def claim_team(db: Session, user: User, league: League, code: str, team_name: str) -> Team:
     """Creates a fresh franchise for `code`, or -- if an AI bot currently runs that
-    team -- hands the human the reins of that same (already-populated) franchise."""
-    if db.query(Team).filter(Team.owner_id == user.id).first() is not None:
-        raise TeamClaimError("You already have a team")
+    team -- hands the human the reins of that same (already-populated) franchise.
+    A user can hold one team per league instance, up to their level-unlocked
+    slot count (core/progression.py) -- the newly claimed team becomes their
+    active one, same as the old implicit single-team behavior."""
+    owned = _owned_team_count(db, user)
+    if owned >= unlocked_slots(_user_level(db, user)):
+        raise TeamClaimError("No free league slot at your current level")
+
+    if db.query(Team).filter(Team.owner_id == user.id, Team.league_id == league.id).first() is not None:
+        raise TeamClaimError("You already have a team in this league")
 
     existing = get_team_by_code(db, league.id, code)
 
@@ -121,18 +139,22 @@ def claim_team(db: Session, user: User, league: League, code: str, team_name: st
         db.flush()
         db.query(User).filter(User.id == old_owner_id, User.is_bot.is_(True)).delete()
         _cap_roster_to_top_by_position(db, existing)
+        user.active_team_id = existing.id
         return existing
 
     team = Team(owner_id=user.id, league_id=league.id, name=team_name, nfl_team_code=code)
     db.add(team)
     db.flush()
     assign_real_roster(db, team, code, league.id)
+    user.active_team_id = team.id
     return team
 
 
 def _release_team_to_bot(db: Session, team: Team) -> None:
     bot_user = User(
-        email=f"bot-{team.nfl_team_code.lower()}@bots.local",
+        # league_id folded in -- the same code (e.g. "NE") can now exist
+        # across multiple concurrent instances of the same sport.
+        email=f"bot-{team.league_id}-{team.nfl_team_code.lower()}@bots.local",
         hashed_password=hash_password(uuid.uuid4().hex),
         display_name=f"{team.name} (AI)",
         is_bot=True,
@@ -145,14 +167,20 @@ def _release_team_to_bot(db: Session, team: Team) -> None:
     db.flush()
 
 
-def release_team(db: Session, user: User) -> None:
-    """Hands the team back to an AI bot so the player can pick a different
-    one -- the mirror image of the takeover branch in claim_team above."""
-    team = db.query(Team).filter(Team.owner_id == user.id).first()
+def release_team(db: Session, user: User, team_id: int) -> None:
+    """Hands the given team back to an AI bot so the player can pick a
+    different one -- the mirror image of the takeover branch in claim_team
+    above. If it was the user's active team, another owned team (if any)
+    becomes active instead."""
+    team = db.query(Team).filter(Team.id == team_id, Team.owner_id == user.id).first()
     if team is None:
-        raise TeamClaimError("You don't have a team")
+        raise TeamClaimError("You don't have this team")
 
     _release_team_to_bot(db, team)
+
+    if user.active_team_id == team.id:
+        fallback = db.query(Team).filter(Team.owner_id == user.id, Team.id != team.id).first()
+        user.active_team_id = fallback.id if fallback else None
 
 
 def release_all_human_teams(db: Session, league: League) -> int:

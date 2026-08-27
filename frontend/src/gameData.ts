@@ -9,6 +9,9 @@ export const STADIUM_LEVELS: Record<
 };
 export const MAX_STADIUM_LEVEL = 4;
 
+// Mirrors backend/app/core/progression.py: SLOT_LEVEL_REQUIREMENTS.
+export const SLOT_LEVEL_REQUIREMENTS: Record<number, number> = { 1: 1, 2: 5, 3: 15 };
+
 export const TACTIC_LABELS: Record<string, string> = {
   BALANCED: "Kiegyensúlyozott",
   PASS_HEAVY: "Passz-orientált",

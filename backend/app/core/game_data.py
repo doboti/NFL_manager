@@ -217,7 +217,7 @@ LEAGUES = {
         "team_conference_by_code": NFL_TEAM_CONFERENCE_BY_CODE,
     },
     "college": {
-        "name": "College Football",
+        "name": "NCAA Football",
         "teams": COLLEGE_TEAMS,
         "team_names_by_code": COLLEGE_TEAM_NAMES_BY_CODE,
         "divisions": COLLEGE_DIVISIONS,

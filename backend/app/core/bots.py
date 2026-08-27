@@ -40,10 +40,15 @@ def seed_bot_teams(db: Session, league: League) -> int:
     """Fills every team in this league without a franchise yet with a
     lightweight AI-controlled one, so there is always a full league to play
     matches and trade against."""
-    existing_codes = {code for (code,) in db.query(Team.nfl_team_code).filter(Team.nfl_team_code.isnot(None))}
+    existing_codes = {
+        code
+        for (code,) in db.query(Team.nfl_team_code).filter(
+            Team.league_id == league.id, Team.nfl_team_code.isnot(None)
+        )
+    }
     created = 0
 
-    for entry in LEAGUES[league.key]["teams"]:
+    for entry in LEAGUES[league.sport]["teams"]:
         code = entry["code"]
         if code in existing_codes:
             continue
@@ -55,7 +60,10 @@ def seed_bot_teams(db: Session, league: League) -> int:
         try:
             with db.begin_nested():
                 bot_user = User(
-                    email=f"bot-{code.lower()}@bots.local",
+                    # league.id folded in -- the same code (e.g. "NE") is
+                    # reused across multiple concurrent instances of the
+                    # same sport, so the bare code alone would collide.
+                    email=f"bot-{league.id}-{code.lower()}@bots.local",
                     hashed_password=hash_password(uuid.uuid4().hex),
                     display_name=f"{entry['name']} (AI)",
                     is_bot=True,

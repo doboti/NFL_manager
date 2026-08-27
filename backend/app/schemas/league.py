@@ -51,6 +51,17 @@ class LeagueOption(BaseModel):
     name: str
 
 
+class LeagueInstanceOut(BaseModel):
+    key: str
+    name: str
+    sport: str
+    is_full: bool
+
+
+class CreateLeagueInstanceRequest(BaseModel):
+    sport: str
+
+
 class PlayoffMatchOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

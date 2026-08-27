@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Lock, Play, Settings, Trophy, X } from "lucide-react";
-import { Profile, changePassword, fetchProfile } from "../api/client";
+import { MyTeam, Profile, activateTeam, changePassword, fetchProfile, listMyTeams } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import PageTransition from "../components/PageTransition";
 import PlayerAvatar from "../components/PlayerAvatar";
 import { SkeletonBlock } from "../components/Skeleton";
+import { SLOT_LEVEL_REQUIREMENTS } from "../gameData";
 
 function PasswordChangeForm() {
   const [currentPassword, setCurrentPassword] = useState("");
@@ -103,17 +104,104 @@ function LevelProgress({ profile }: { profile: Profile }) {
   );
 }
 
+function LeagueSlots({ profile, teams }: { profile: Profile; teams: MyTeam[] }) {
+  const navigate = useNavigate();
+  const [busy, setBusy] = useState<number | null>(null);
+
+  const slots = [1, 2, 3].map((slotNumber) => {
+    const team = teams[slotNumber - 1];
+    if (team) return { slotNumber, state: "occupied" as const, team };
+    if (slotNumber <= profile.unlocked_slots) return { slotNumber, state: "empty" as const };
+    return { slotNumber, state: "locked" as const, requiredLevel: SLOT_LEVEL_REQUIREMENTS[slotNumber] };
+  });
+
+  return (
+    <div className="mb-6 space-y-3">
+      {slots.map((slot) => {
+        if (slot.state === "locked") {
+          return (
+            <div
+              key={slot.slotNumber}
+              className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/50 px-4 py-3 text-slate-600"
+            >
+              <Lock size={18} className="shrink-0" />
+              <span className="text-sm">
+                {slot.slotNumber}. liga-slot &middot; {slot.requiredLevel}. szinttől nyílik meg
+              </span>
+            </div>
+          );
+        }
+
+        if (slot.state === "occupied") {
+          return (
+            <motion.button
+              key={slot.slotNumber}
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.98 }}
+              disabled={busy === slot.team.id}
+              onClick={async () => {
+                setBusy(slot.team.id);
+                try {
+                  await activateTeam(slot.team.id);
+                  navigate("/");
+                } finally {
+                  setBusy(null);
+                }
+              }}
+              className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-left transition hover:border-gridiron-accent disabled:opacity-60"
+            >
+              <span className="text-sm">
+                <span className="font-semibold text-slate-200">{slot.team.league_name}</span>
+                <span className="text-slate-500"> &ndash; {slot.team.name}</span>
+              </span>
+              {slot.team.is_active && (
+                <span className="rounded bg-gridiron-accent/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-gridiron-accent">
+                  Aktív
+                </span>
+              )}
+            </motion.button>
+          );
+        }
+
+        return (
+          <motion.button
+            key={slot.slotNumber}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            animate={{
+              boxShadow: [
+                "0 0 0px rgba(52,211,153,0.35)",
+                "0 0 26px rgba(52,211,153,0.6)",
+                "0 0 0px rgba(52,211,153,0.35)",
+              ],
+            }}
+            transition={{ boxShadow: { duration: 2.4, repeat: Infinity, ease: "easeInOut" } }}
+            onClick={() => navigate("/select-team")}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gridiron-accent py-3 text-base font-bold text-slate-950 transition hover:brightness-110"
+          >
+            <Play size={20} fill="currentColor" />
+            Liga és csapat választása
+          </motion.button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [myTeams, setMyTeams] = useState<MyTeam[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
   const { logout } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchProfile()
-      .then(setProfile)
+    Promise.all([fetchProfile(), listMyTeams()])
+      .then(([profileData, teamsData]) => {
+        setProfile(profileData);
+        setMyTeams(teamsData);
+      })
       .catch(() => setError("Nem sikerült betölteni a profilt."));
   }, []);
 
@@ -184,23 +272,7 @@ export default function ProfilePage() {
               <LevelProgress profile={profile} />
             </div>
 
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.97 }}
-              animate={{
-                boxShadow: [
-                  "0 0 0px rgba(52,211,153,0.35)",
-                  "0 0 26px rgba(52,211,153,0.6)",
-                  "0 0 0px rgba(52,211,153,0.35)",
-                ],
-              }}
-              transition={{ boxShadow: { duration: 2.4, repeat: Infinity, ease: "easeInOut" } }}
-              onClick={() => navigate("/select-team")}
-              className="mb-6 flex w-full items-center justify-center gap-2 rounded-lg bg-gridiron-accent py-3 text-base font-bold text-slate-950 transition hover:brightness-110"
-            >
-              <Play size={20} fill="currentColor" />
-              Liga és csapat választása
-            </motion.button>
+            <LeagueSlots profile={profile} teams={myTeams ?? []} />
 
             <h2 className="mb-3 flex items-center gap-2 text-xl font-semibold">
               <Trophy size={18} className="text-gridiron-accent" />

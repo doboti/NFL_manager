@@ -54,6 +54,15 @@ class TeamSummary(BaseModel):
     avg_overall: float | None = None
 
 
+class MyTeamOut(BaseModel):
+    id: int
+    name: str
+    league_id: int
+    league_key: str
+    league_name: str
+    is_active: bool
+
+
 class TeamRosterOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

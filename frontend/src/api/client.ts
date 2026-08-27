@@ -276,12 +276,48 @@ export async function claimTeam(leagueKey: string, nflTeamCode: string) {
   return data;
 }
 
-export async function releaseTeam() {
-  await apiClient.post("/teams/release");
+export async function releaseTeam(teamId: number) {
+  await apiClient.post(`/teams/${teamId}/release`);
 }
 
 export async function fetchMyTeam() {
   const { data } = await apiClient.get<Team>("/teams/me");
+  return data;
+}
+
+export interface MyTeam {
+  id: number;
+  name: string;
+  league_id: number;
+  league_key: string;
+  league_name: string;
+  is_active: boolean;
+}
+
+export async function listMyTeams() {
+  const { data } = await apiClient.get<MyTeam[]>("/teams/mine");
+  return data;
+}
+
+export async function activateTeam(teamId: number) {
+  const { data } = await apiClient.post<Team>(`/teams/${teamId}/activate`);
+  return data;
+}
+
+export interface LeagueInstance {
+  key: string;
+  name: string;
+  sport: string;
+  is_full: boolean;
+}
+
+export async function listLeagueInstances(sport: string) {
+  const { data } = await apiClient.get<LeagueInstance[]>("/league/instances", { params: { sport } });
+  return data;
+}
+
+export async function createLeagueInstance(sport: string) {
+  const { data } = await apiClient.post<LeagueInstance>("/league/instances", { sport });
   return data;
 }
 

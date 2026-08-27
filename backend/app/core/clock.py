@@ -34,11 +34,51 @@ def get_or_create_game_clock(db: Session) -> GameClock:
 
 
 def get_or_create_league(db: Session, key: str) -> League:
+    """Resolves/creates the *default* (first) instance of a sport -- `key`
+    is historically just the sport name ("nfl"/"college") for these two
+    built-in rows. See create_league_instance() for any additional,
+    self-service-created instance of the same sport."""
     league = db.query(League).filter(League.key == key).first()
     if league is None:
-        league = League(key=key, name=LEAGUES[key]["name"])
+        league = League(key=key, sport=key, name=LEAGUES[key]["name"])
         db.add(league)
         db.flush()
+    return league
+
+
+def create_league_instance(db: Session, sport: str) -> League:
+    """Creates an additional, independent instance of a sport (own
+    32-team universe: schedule, free-agent pool, economy) -- what lets a
+    manager hold 2 concurrent NFL teams once a league slot unlocks, since
+    a single NFL instance only ever has 32 real teams to claim. Immediately
+    imports real players and seeds bot teams so it's playable right away.
+    Caller (routers/league.py) is responsible for checking the requester
+    actually has a free slot and that no existing instance of this sport
+    still has room before calling this."""
+    if sport not in LEAGUES:
+        raise ValueError(f"Unknown sport: {sport}")
+
+    existing_count = db.query(League).filter(League.sport == sport).count()
+    n = existing_count + 1
+    key = sport if n == 1 else f"{sport}-{n}"
+    name = LEAGUES[sport]["name"] if n == 1 else f"{LEAGUES[sport]['name']} #{n}"
+
+    league = League(key=key, sport=sport, name=name)
+    db.add(league)
+    db.flush()
+
+    # Local import to avoid a circular import (these scripts import from
+    # app.core.clock themselves).
+    from app.core.bots import seed_bot_teams
+    from app.scripts.import_college_players import import_players as import_college
+    from app.scripts.import_nfl_players import import_players as import_nfl
+
+    if sport == "nfl":
+        import_nfl(db, league)
+    elif sport == "college":
+        import_college(db, league)
+    seed_bot_teams(db, league)
+
     return league
 
 

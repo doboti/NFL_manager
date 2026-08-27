@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, resolve_active_team
 from app.core.training import TrainingError, collect_training, start_training
 from app.models.player import Player
 from app.models.team import Team
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/training", tags=["training"])
 
 
 def _get_team_id(current_user: User, db: Session) -> int:
-    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    team = resolve_active_team(db, current_user)
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
     return team.id

@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import case
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, resolve_active_team
 from app.core.market import MarketError, buy_player
 from app.models.enums import Position
 from app.models.player import Player
-from app.models.team import Team
 from app.models.user import User
 from app.schemas.player import PlayerOut
 from app.schemas.team import TeamOut
@@ -36,7 +35,7 @@ def list_market(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    team = resolve_active_team(db, current_user)
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
 
@@ -67,12 +66,7 @@ def buy(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    team = (
-        db.query(Team)
-        .options(joinedload(Team.players))
-        .filter(Team.owner_id == current_user.id)
-        .first()
-    )
+    team = resolve_active_team(db, current_user)
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
 

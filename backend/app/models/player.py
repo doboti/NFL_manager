@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -10,6 +10,13 @@ from app.models.enums import Position
 
 class Player(Base):
     __tablename__ = "players"
+    __table_args__ = (
+        # The same real ESPN athlete now legitimately gets a separate Player
+        # row per league instance (each instance re-imports the full real
+        # player pool independently) -- was a bare global unique before,
+        # which would have blocked importing into a 2nd instance entirely.
+        UniqueConstraint("league_id", "espn_id", name="uq_players_league_espn_id"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     team_id: Mapped[int | None] = mapped_column(ForeignKey("teams.id"), nullable=True, index=True)
@@ -33,7 +40,7 @@ class Player(Base):
 
     market_price: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
-    espn_id: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True, index=True)
+    espn_id: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     photo_url: Mapped[str | None] = mapped_column(String(255), nullable=True)
     nfl_team: Mapped[str | None] = mapped_column(String(10), nullable=True)
 

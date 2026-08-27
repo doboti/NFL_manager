@@ -50,7 +50,7 @@ def advance_regular_season_day(db: Session, league: League, now: datetime) -> No
 
 
 def start_playoffs(db: Session, league: League, now: datetime) -> None:
-    league_data = LEAGUES[league.key]
+    league_data = LEAGUES[league.sport]
     divisions = league_data["divisions"]
     conference_by_code = league_data["team_conference_by_code"]
     conferences = sorted(set(conference_by_code.values()))
@@ -127,7 +127,7 @@ def advance_playoffs(db: Session, league: League, now: datetime) -> dict | None:
     if not round_matches or any(not m.played for m in round_matches):
         return None
 
-    conference_by_code = LEAGUES[league.key]["team_conference_by_code"]
+    conference_by_code = LEAGUES[league.sport]["team_conference_by_code"]
     conferences = sorted(set(conference_by_code.values()))
 
     winner_ids = [m.home_team_id if (m.home_score or 0) > (m.away_score or 0) else m.away_team_id for m in round_matches]

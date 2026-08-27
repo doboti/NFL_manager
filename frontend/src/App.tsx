@@ -41,13 +41,6 @@ function RequireTeam({ children }: { children: JSX.Element }) {
   return children;
 }
 
-function RequireNoTeam({ children }: { children: JSX.Element }) {
-  const status = useTeamStatus();
-  if (status === "loading") return <SkeletonDashboard />;
-  if (status === "has-team") return <Navigate to="/" replace />;
-  return children;
-}
-
 type AdminStatus = "loading" | "admin" | "not-admin";
 
 function useAdminStatus(): AdminStatus {
@@ -114,9 +107,7 @@ export default function App() {
           element={
             <RequireAuth>
               <RedirectAdminAway>
-                <RequireNoTeam>
-                  <SelectTeam />
-                </RequireNoTeam>
+                <SelectTeam />
               </RedirectAdminAway>
             </RequireAuth>
           }

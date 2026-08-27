@@ -22,6 +22,7 @@ from app.core.clock import get_or_create_league
 from app.core.database import SessionLocal
 from app.core.game_data import NFL_OVR_PERCENTILE_CURVE, overall_from_percentile, player_market_value
 from app.models.enums import Position
+from app.models.league import League
 from app.models.player import Player
 
 TEAMS_URL = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/teams?limit=40"
@@ -176,8 +177,13 @@ def rate_candidates(candidates: list[Candidate], leader_bonuses: dict[str, int])
             c.potential = min(cap, c.overall + headroom)
 
 
-def import_players(db: Session) -> dict:
-    league = get_or_create_league(db, "nfl")
+def import_players(db: Session, league: League | None = None) -> dict:
+    """`league` defaults to the original single NFL instance for backward
+    compatibility (CLI usage, existing re-runs) -- a freshly self-service
+    created 2nd+ instance passes its own League row explicitly (see
+    core.clock.create_league_instance)."""
+    if league is None:
+        league = get_or_create_league(db, "nfl")
     teams = fetch_teams()
     skipped = 0
     candidates: list[Candidate] = []
@@ -224,7 +230,11 @@ def import_players(db: Session) -> dict:
                 experience_years = (athlete.get("experience") or {}).get("years", 0)
                 headshot = (athlete.get("headshot") or {}).get("href")
 
-                existing = db.query(Player).filter(Player.espn_id == espn_id).first()
+                existing = (
+                    db.query(Player)
+                    .filter(Player.espn_id == espn_id, Player.league_id == league.id)
+                    .first()
+                )
                 candidates.append(
                     Candidate(
                         espn_id=espn_id,

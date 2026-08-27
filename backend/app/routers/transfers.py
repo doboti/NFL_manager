@@ -3,11 +3,10 @@ from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, resolve_active_team
 from app.core.roster import RosterError, buy_transfer_listed_player
 from app.models.enums import Position
 from app.models.player import Player
-from app.models.team import Team
 from app.models.user import User
 from app.schemas.player import PlayerOut
 from app.schemas.team import TeamOut
@@ -24,7 +23,7 @@ _POSITION_ORDER = case(
 
 @router.get("/", response_model=list[PlayerOut])
 def list_transfer_listed(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    team = resolve_active_team(db, current_user)
     if team is None:
         return []
 
@@ -45,7 +44,7 @@ def buy(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    team = db.query(Team).filter(Team.owner_id == current_user.id).first()
+    team = resolve_active_team(db, current_user)
     if team is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team not found")
 
