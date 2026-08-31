@@ -211,6 +211,14 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
 
   useEffect(() => {
     refresh().catch(() => setError("Nem sikerült betölteni a tárgyalásokat."));
+    // Bot replies land somewhere in a random up-to-4h window, resolved
+    // server-side by a background job -- without polling, a tab left open
+    // never learns about it until the user manually navigates away and
+    // back or reloads.
+    const interval = setInterval(() => {
+      refresh().catch(() => undefined);
+    }, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
