@@ -1,3 +1,5 @@
+import logging
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -7,6 +9,8 @@ from app.core.clock import now_utc
 from app.core.daily_cycle import run_daily_cycle
 from app.core.database import SessionLocal
 from app.core.game_data import LEAGUE_TIMEZONE, MATCH_HOUR
+
+logger = logging.getLogger("app.scheduler")
 
 scheduler = BackgroundScheduler(timezone=LEAGUE_TIMEZONE)
 
@@ -20,6 +24,13 @@ def _run_daily_cycle_job() -> None:
     db = SessionLocal()
     try:
         run_daily_cycle(db)
+    except Exception:
+        # A silently-dying scheduled job (APScheduler logs to its own
+        # logger, which may not surface in `docker compose logs` depending
+        # on logging config) looks identical to "the scheduler never ran
+        # at all" from the outside -- print explicitly so it's visible in
+        # plain container logs no matter what.
+        logger.exception("daily_cycle job failed")
     finally:
         db.close()
 
@@ -28,6 +39,8 @@ def _resolve_bot_trade_offers_job() -> None:
     db = SessionLocal()
     try:
         resolve_bot_trade_offers(db, now_utc(db))
+    except Exception:
+        logger.exception("resolve_bot_trade_offers job failed")
     finally:
         db.close()
 

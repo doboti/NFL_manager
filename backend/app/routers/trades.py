@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.bots import resolve_bot_trade_offers
+from app.core.clock import now_utc
 from app.core.database import get_db
 from app.core.deps import get_current_user, resolve_active_team
 from app.core.trades import TradeError, accept_offer, cancel_offer, create_offer, reject_offer
@@ -33,6 +35,11 @@ def _query_options(db_query):
 @router.get("/", response_model=list[TradeOfferOut])
 def list_offers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     team = _get_team(current_user, db)
+    # Belt-and-suspenders alongside the background scheduler (which resolves
+    # due bot offers every 15 min): also resolve opportunistically on every
+    # page load, so a manager sees up-to-date replies even if the scheduled
+    # job hasn't fired yet for whatever reason.
+    resolve_bot_trade_offers(db, now_utc(db))
     query = db.query(TradeOffer).filter(
         or_(TradeOffer.from_team_id == team.id, TradeOffer.to_team_id == team.id)
     )

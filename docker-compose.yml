@@ -17,6 +17,12 @@ services:
 
   backend:
     build: ./backend
+    # Dev-only: --reload watches the bind-mounted source below for live
+    # editing. Production runs the Dockerfile's plain CMD (no bind mount,
+    # nothing to watch, and --reload's file-watcher there was pure risk --
+    # any spurious restart kills the in-process APScheduler background
+    # thread that resolves bot trade offers/runs the daily cycle).
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
     environment:
       DATABASE_URL: postgresql+psycopg2://gridiron:gridiron@db:5432/gridiron
       JWT_SECRET_KEY: dev-secret-change-me
