@@ -93,9 +93,18 @@ function OfferRow({
         {!offer.offered_player && offer.cash_offer === 0 && <span className="text-slate-500">semmi</span>}
       </div>
 
-      {offer.status === "PENDING" && offer.respond_at && (
+      {offer.status === "PENDING" && (
         <p className="mt-1 text-xs text-slate-500">
-          Válasz várható: <CountdownText target={offer.respond_at} />
+          Küldve: {new Date(offer.created_at).toLocaleString("hu-HU")}
+          {offer.respond_at ? (
+            <>
+              {" "}
+              &middot; Válasz várható: <CountdownText target={offer.respond_at} /> (
+              {new Date(offer.respond_at).toLocaleString("hu-HU")})
+            </>
+          ) : (
+            <> &middot; nincs respond_at beállítva (a célcsapat nem bot volt küldéskor?)</>
+          )}
         </p>
       )}
 
