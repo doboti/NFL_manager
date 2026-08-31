@@ -23,7 +23,14 @@ class TradeOffer(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Bot-only: when a bot-addressed offer gets its automatic accept/reject
+    # decision (0-4h after creation, see trades.py: BOT_RESPONSE_WINDOW_HOURS).
     respond_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Every offer, bot or human target: auto-expires if still PENDING after
+    # this (24h from creation) -- a human recipient who never responds
+    # shouldn't leave an offer stuck forever. Nullable only because it
+    # predates existing rows; those get backfilled once, see the migration.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     from_team: Mapped["Team"] = relationship(foreign_keys=[from_team_id])
     to_team: Mapped["Team"] = relationship(foreign_keys=[to_team_id])
@@ -37,3 +44,7 @@ class TradeOffer(Base):
     @property
     def to_team_name(self) -> str:
         return self.to_team.name
+
+    @property
+    def to_team_is_bot(self) -> bool:
+        return self.to_team.is_bot

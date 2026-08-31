@@ -14,6 +14,12 @@ from app.models.trade_offer import TradeOffer
 # it doesn't feel like the offer just sits there until the next match.
 BOT_RESPONSE_WINDOW_HOURS = 4.0
 
+# Every offer, bot or human target, auto-expires after this if still
+# PENDING -- a human recipient who never logs back in shouldn't leave an
+# offer stuck forever (bots always resolve well within this window via
+# BOT_RESPONSE_WINDOW_HOURS above, so this mainly matters for human targets).
+MAX_OFFER_LIFETIME_HOURS = 24.0
+
 
 class TradeError(Exception):
     pass
@@ -54,9 +60,10 @@ def create_offer(
     if cash_offer > from_team.franchise_capital:
         raise TradeError("Not enough Franchise Tőke for this offer")
 
+    now = now_utc(db)
     respond_at = None
     if to_team.is_bot:
-        respond_at = now_utc(db) + timedelta(hours=random.uniform(0, BOT_RESPONSE_WINDOW_HOURS))
+        respond_at = now + timedelta(hours=random.uniform(0, BOT_RESPONSE_WINDOW_HOURS))
 
     offer = TradeOffer(
         from_team_id=from_team.id,
@@ -65,11 +72,39 @@ def create_offer(
         offered_player_id=offered_player_id,
         cash_offer=cash_offer,
         respond_at=respond_at,
+        expires_at=now + timedelta(hours=MAX_OFFER_LIFETIME_HOURS),
     )
     db.add(offer)
     db.commit()
     db.refresh(offer)
     return offer
+
+
+def expire_stale_offers(db: Session, now: datetime | None = None) -> int:
+    """Marks any PENDING offer past its expires_at as EXPIRED, regardless of
+    whether the target is a bot or a human -- bots always resolve well
+    within MAX_OFFER_LIFETIME_HOURS via BOT_RESPONSE_WINDOW_HOURS, so in
+    practice this only ever catches offers sent to a human who never
+    responded. A NULL expires_at (an offer from before this column existed)
+    is left alone rather than guessed at."""
+    now = now or now_utc(db)
+    stale = (
+        db.query(TradeOffer)
+        .filter(
+            TradeOffer.status == TradeStatus.PENDING,
+            TradeOffer.expires_at.isnot(None),
+            TradeOffer.expires_at <= now,
+        )
+        .all()
+    )
+    for offer in stale:
+        offer.status = TradeStatus.EXPIRED
+        offer.resolved_at = now
+
+    if stale:
+        db.commit()
+
+    return len(stale)
 
 
 def _get_pending_offer(db: Session, offer_id: int) -> TradeOffer:

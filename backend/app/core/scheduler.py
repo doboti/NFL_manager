@@ -9,6 +9,7 @@ from app.core.clock import now_utc
 from app.core.daily_cycle import run_daily_cycle
 from app.core.database import SessionLocal
 from app.core.game_data import LEAGUE_TIMEZONE, MATCH_HOUR
+from app.core.trades import expire_stale_offers
 
 logger = logging.getLogger("app.scheduler")
 
@@ -38,7 +39,9 @@ def _run_daily_cycle_job() -> None:
 def _resolve_bot_trade_offers_job() -> None:
     db = SessionLocal()
     try:
-        resolve_bot_trade_offers(db, now_utc(db))
+        now = now_utc(db)
+        resolve_bot_trade_offers(db, now)
+        expire_stale_offers(db, now)
     except Exception:
         logger.exception("resolve_bot_trade_offers job failed")
     finally:

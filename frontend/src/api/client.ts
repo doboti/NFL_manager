@@ -16,7 +16,7 @@ apiClient.interceptors.request.use((config) => {
 
 export type Tactic = "BALANCED" | "PASS_HEAVY" | "RUN_HEAVY" | "BLITZ" | "PREVENT";
 export type SponsorType = "FIXED" | "PERFORMANCE";
-export type TradeStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED";
+export type TradeStatus = "PENDING" | "ACCEPTED" | "REJECTED" | "CANCELLED" | "EXPIRED";
 
 export interface Player {
   id: number;
@@ -187,6 +187,7 @@ export interface TradeOffer {
   to_team_id: number;
   from_team_name: string;
   to_team_name: string;
+  to_team_is_bot: boolean;
   target_player: Player;
   offered_player: Player | null;
   cash_offer: number;
@@ -194,6 +195,7 @@ export interface TradeOffer {
   created_at: string;
   resolved_at: string | null;
   respond_at: string | null;
+  expires_at: string | null;
 }
 
 // --- auth & team selection ---

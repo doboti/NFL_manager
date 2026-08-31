@@ -31,6 +31,7 @@ const STATUS_LABELS: Record<string, string> = {
   ACCEPTED: "Elfogadva",
   REJECTED: "Elutasítva",
   CANCELLED: "Visszavonva",
+  EXPIRED: "Lejárt",
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -38,6 +39,7 @@ const STATUS_STYLES: Record<string, string> = {
   ACCEPTED: "text-emerald-400",
   REJECTED: "text-red-400/70",
   CANCELLED: "text-slate-500",
+  EXPIRED: "text-slate-500",
 };
 
 function OfferRow({
@@ -93,19 +95,34 @@ function OfferRow({
         {!offer.offered_player && offer.cash_offer === 0 && <span className="text-slate-500">semmi</span>}
       </div>
 
-      {offer.status === "PENDING" && (
+      {offer.status === "PENDING" && !isIncoming && (
         <p className="mt-1 text-xs text-slate-500">
           Küldve: {new Date(offer.created_at).toLocaleString("hu-HU")}
-          {offer.respond_at ? (
+          {offer.to_team_is_bot ? (
+            offer.respond_at && (
+              <>
+                {" "}
+                &middot; AI válasz várható: <CountdownText target={offer.respond_at} /> (
+                {new Date(offer.respond_at).toLocaleString("hu-HU")})
+              </>
+            )
+          ) : (
             <>
               {" "}
-              &middot; Válasz várható: <CountdownText target={offer.respond_at} /> (
-              {new Date(offer.respond_at).toLocaleString("hu-HU")})
+              &middot; <span className="text-slate-400">Emberi tulajdonos -- vár a válaszára</span>
+              {offer.expires_at && (
+                <>
+                  , automatikusan lejár: <CountdownText target={offer.expires_at} /> (
+                  {new Date(offer.expires_at).toLocaleString("hu-HU")})
+                </>
+              )}
             </>
-          ) : (
-            <> &middot; nincs respond_at beállítva (a célcsapat nem bot volt küldéskor?)</>
           )}
         </p>
+      )}
+
+      {offer.status === "PENDING" && isIncoming && (
+        <p className="mt-1 text-xs text-slate-500">Érkezett: {new Date(offer.created_at).toLocaleString("hu-HU")}</p>
       )}
 
       {offer.status === "PENDING" && (

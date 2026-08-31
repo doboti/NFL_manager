@@ -6,7 +6,7 @@ from app.core.bots import resolve_bot_trade_offers
 from app.core.clock import now_utc
 from app.core.database import get_db
 from app.core.deps import get_current_user, resolve_active_team
-from app.core.trades import TradeError, accept_offer, cancel_offer, create_offer, reject_offer
+from app.core.trades import TradeError, accept_offer, cancel_offer, create_offer, expire_stale_offers, reject_offer
 from app.models.player import Player
 from app.models.team import Team
 from app.models.trade_offer import TradeOffer
@@ -39,7 +39,9 @@ def list_offers(current_user: User = Depends(get_current_user), db: Session = De
     # due bot offers every 15 min): also resolve opportunistically on every
     # page load, so a manager sees up-to-date replies even if the scheduled
     # job hasn't fired yet for whatever reason.
-    resolve_bot_trade_offers(db, now_utc(db))
+    now = now_utc(db)
+    resolve_bot_trade_offers(db, now)
+    expire_stale_offers(db, now)
     query = db.query(TradeOffer).filter(
         or_(TradeOffer.from_team_id == team.id, TradeOffer.to_team_id == team.id)
     )

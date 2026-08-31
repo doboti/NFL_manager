@@ -28,6 +28,7 @@ class TradeStatus(str, enum.Enum):
     ACCEPTED = "ACCEPTED"
     REJECTED = "REJECTED"
     CANCELLED = "CANCELLED"
+    EXPIRED = "EXPIRED"
 
 
 class SeasonPhase(str, enum.Enum):

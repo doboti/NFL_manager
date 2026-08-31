@@ -7,6 +7,7 @@ from app.core.injuries import maybe_injure_player
 from app.core.league_schedule import ensure_fixtures_scheduled
 from app.core.season_manager import advance_playoffs, advance_regular_season_day
 from app.core.simulation import select_starting_lineup, simulate_match
+from app.core.trades import expire_stale_offers
 from app.models.enums import SeasonPhase
 from app.models.match import Match
 from app.models.team import Team
@@ -133,6 +134,7 @@ def run_daily_cycle(db: Session) -> dict:
         bot_initiate_trades(db, league, now)
 
     bot_trades = resolve_bot_trade_offers(db, now)
+    expire_stale_offers(db, now)
 
     return {
         "matches": match_results,

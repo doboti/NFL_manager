@@ -21,6 +21,7 @@ class TradeOfferOut(BaseModel):
     to_team_id: int
     from_team_name: str
     to_team_name: str
+    to_team_is_bot: bool
     target_player: PlayerOut
     offered_player: PlayerOut | None
     cash_offer: int
@@ -28,6 +29,7 @@ class TradeOfferOut(BaseModel):
     created_at: datetime
     resolved_at: datetime | None
     respond_at: datetime | None
+    expires_at: datetime | None
 
 
 class PlayerSearchResult(BaseModel):
