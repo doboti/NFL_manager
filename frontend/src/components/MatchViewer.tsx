@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { PlayEvent } from "../api/client";
 import AnimatedNumber from "./AnimatedNumber";
+import FieldView from "./FieldView";
 
 interface Props {
   homeTeamName: string;
@@ -8,6 +10,7 @@ interface Props {
   homeScore: number;
   awayScore: number;
   playLog: string[];
+  playEvents?: PlayEvent[] | null;
 }
 
 interface ParsedPlay {
@@ -31,7 +34,8 @@ function parseLine(line: string): ParsedPlay {
   };
 }
 
-export default function MatchViewer({ homeTeamName, awayTeamName, homeScore, awayScore, playLog }: Props) {
+export default function MatchViewer({ homeTeamName, awayTeamName, homeScore, awayScore, playLog, playEvents }: Props) {
+  const hasFieldView = !!playEvents && playEvents.length > 0;
   const parsed = useMemo(() => playLog.map(parseLine), [playLog]);
   const [revealed, setRevealed] = useState(0);
   const [burst, setBurst] = useState<string | null>(null);
@@ -42,6 +46,10 @@ export default function MatchViewer({ homeTeamName, awayTeamName, homeScore, awa
   }, [playLog]);
 
   useEffect(() => {
+    // The new structured-event field view (below) handles its own reveal
+    // timing -- this classic text-log reveal is only needed as a fallback
+    // for matches that predate play_events.
+    if (hasFieldView) return;
     if (revealed >= parsed.length) return;
     const timer = setTimeout(() => {
       const next = parsed[revealed];
@@ -52,7 +60,19 @@ export default function MatchViewer({ homeTeamName, awayTeamName, homeScore, awa
       setRevealed((r) => r + 1);
     }, 650);
     return () => clearTimeout(timer);
-  }, [revealed, parsed]);
+  }, [revealed, parsed, hasFieldView]);
+
+  if (hasFieldView) {
+    return (
+      <FieldView
+        homeTeamName={homeTeamName}
+        awayTeamName={awayTeamName}
+        homeScore={homeScore}
+        awayScore={awayScore}
+        playEvents={playEvents!}
+      />
+    );
+  }
 
   const done = revealed >= parsed.length;
 

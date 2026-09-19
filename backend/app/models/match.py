@@ -24,6 +24,11 @@ class Match(Base):
     away_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     play_log: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    # Structured per-play data (field position, participants, pass/run
+    # success) for the animated field-view replay -- additive alongside
+    # play_log, nullable since older matches predate it and simply fall
+    # back to the classic text-log viewer.
+    play_events: Mapped[list | None] = mapped_column(JSON, nullable=True)
     played: Mapped[bool] = mapped_column(Boolean, default=False)
 
     scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

@@ -1,8 +1,30 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import Tactic
+
+
+class PlayerRef(BaseModel):
+    first_name: str
+    last_name: str
+    photo_url: str | None
+
+
+class PlayEventOut(BaseModel):
+    quarter: int
+    offense: Literal["home", "away"]
+    play_type: Literal["pass", "run", "field_goal", "punt", "safety"]
+    success: bool
+    start_yard: int
+    end_yard: int
+    yards: int
+    result: str
+    points: int
+    primary_player: PlayerRef | None
+    secondary_player: PlayerRef | None
+    text: str
 
 
 class MatchOut(BaseModel):
@@ -18,6 +40,7 @@ class MatchOut(BaseModel):
     home_tactic: Tactic
     away_tactic: Tactic
     play_log: list[str] | None
+    play_events: list[PlayEventOut] | None
     played: bool
     played_at: datetime | None
     is_playoff: bool
@@ -29,6 +52,7 @@ class PracticeMatchResult(BaseModel):
     home_score: int
     away_score: int
     play_log: list[str]
+    play_events: list[PlayEventOut]
 
 
 class DailyCycleSummary(BaseModel):

@@ -74,6 +74,7 @@ def practice_match(current_user: User = Depends(get_current_user), db: Session =
         home_score=result["home_score"],
         away_score=result["away_score"],
         play_log=result["play_log"],
+        play_events=result["play_events"],
     )
 
 
