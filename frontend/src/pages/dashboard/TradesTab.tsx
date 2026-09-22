@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeftRight, Search } from "lucide-react";
 import {
   Player,
@@ -49,6 +49,7 @@ function OfferRow({
   onAccept,
   onReject,
   onCancel,
+  onEditResend,
 }: {
   offer: TradeOffer;
   isIncoming: boolean;
@@ -56,6 +57,7 @@ function OfferRow({
   onAccept: () => void;
   onReject: () => void;
   onCancel: () => void;
+  onEditResend?: () => void;
 }) {
   return (
     <Card className="text-sm">
@@ -143,11 +145,25 @@ function OfferRow({
           )}
         </div>
       )}
+
+      {offer.status === "REJECTED" && !isIncoming && onEditResend && (
+        <div className="mt-3">
+          <SecondaryButton onClick={onEditResend} className="px-3 py-1 text-xs">
+            Módosítás és újraküldés
+          </SecondaryButton>
+        </div>
+      )}
     </Card>
   );
 }
 
-function PlayerSearch({ ownTeamId }: { ownTeamId: number }) {
+function PlayerSearch({
+  ownTeamId,
+  onOfferFor,
+}: {
+  ownTeamId: number;
+  onOfferFor: (player: PlayerSearchResult) => void;
+}) {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<PlayerSearchResult[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -186,30 +202,44 @@ function PlayerSearch({ ownTeamId }: { ownTeamId: number }) {
       )}
       {!searching && results !== null && results.length > 0 && (
         <div className="mt-3 space-y-1.5">
-          {results.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between rounded-lg bg-black/20 px-3 py-2 text-sm"
-            >
-              <span>
-                {p.first_name} {p.last_name}{" "}
-                <span className="text-xs text-slate-500">
-                  ({p.position}, OVR {p.overall})
+          {results.map((p) => {
+            const offerable = p.team_id !== null && p.team_id !== ownTeamId;
+            const row = (
+              <>
+                <span>
+                  {p.first_name} {p.last_name}{" "}
+                  <span className="text-xs text-slate-500">
+                    ({p.position}, OVR {p.overall})
+                  </span>
                 </span>
-              </span>
-              <span
-                className={
-                  p.team_id === ownTeamId
-                    ? "text-xs font-semibold text-emerald-400"
-                    : p.team_id === null
-                      ? "text-xs text-slate-500"
-                      : "text-xs text-slate-300"
-                }
+                <span
+                  className={
+                    p.team_id === ownTeamId
+                      ? "text-xs font-semibold text-emerald-400"
+                      : p.team_id === null
+                        ? "text-xs text-slate-500"
+                        : "text-xs text-slate-300"
+                  }
+                >
+                  {p.team_id === ownTeamId ? "Nálad" : p.team_name ?? "Szabadügynök"}
+                </span>
+              </>
+            );
+            return offerable ? (
+              <button
+                key={p.id}
+                onClick={() => onOfferFor(p)}
+                className="flex w-full items-center justify-between rounded-lg bg-black/20 px-3 py-2 text-left text-sm transition hover:bg-black/40"
+                title="Ajánlat készítése erre a játékosra"
               >
-                {p.team_id === ownTeamId ? "Nálad" : p.team_name ?? "Szabadügynök"}
-              </span>
-            </div>
-          ))}
+                {row}
+              </button>
+            ) : (
+              <div key={p.id} className="flex items-center justify-between rounded-lg bg-black/20 px-3 py-2 text-sm">
+                {row}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -228,6 +258,11 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
   const [targetPlayerId, setTargetPlayerId] = useState<number | null>(null);
   const [offeredPlayerId, setOfferedPlayerId] = useState<number | null>(null);
   const [cashOffer, setCashOffer] = useState("0");
+  const formRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showForm) formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [showForm]);
 
   async function refresh() {
     const [offerData, teamsData] = await Promise.all([listTradeOffers(), listOtherTeams()]);
@@ -278,6 +313,19 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
     setCashOffer("0");
   }
 
+  function openOfferForm(
+    teamId: number,
+    playerId: number,
+    prefill?: { offeredPlayerId: number | null; cashOffer: number }
+  ) {
+    setSelectedTeamId(teamId);
+    setTargetPlayerId(playerId);
+    setOfferedPlayerId(prefill?.offeredPlayerId ?? null);
+    setCashOffer(String(prefill?.cashOffer ?? 0));
+    setShowForm(true);
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   const incoming = (offers ?? []).filter((o) => o.to_team_id === team.id);
   const outgoing = (offers ?? []).filter((o) => o.from_team_id === team.id);
 
@@ -289,7 +337,12 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
         áras ajánlatot fogadnak el).
       </p>
 
-      <PlayerSearch ownTeamId={team.id} />
+      <PlayerSearch
+        ownTeamId={team.id}
+        onOfferFor={(p) => {
+          if (p.team_id !== null) openOfferForm(p.team_id, p.id);
+        }}
+      />
 
       <div className="mb-6">
         <PrimaryButton onClick={() => setShowForm((v) => !v)}>
@@ -297,87 +350,89 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
         </PrimaryButton>
 
         {showForm && (
-          <Card className="mt-4 space-y-3">
-            <div>
-              <label className="mb-1 block text-xs text-slate-400">Csapat</label>
-              <select
-                value={selectedTeamId ?? ""}
-                onChange={(e) => {
-                  setSelectedTeamId(e.target.value ? Number(e.target.value) : null);
-                  setTargetPlayerId(null);
-                }}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
-              >
-                <option value="">Válassz csapatot...</option>
-                {otherTeams.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                    {t.is_bot ? " (AI)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {selectedTeamId !== null && (
+          <div ref={formRef}>
+            <Card className="mt-4 space-y-3">
               <div>
-                <label className="mb-1 block text-xs text-slate-400">Kért játékos</label>
+                <label className="mb-1 block text-xs text-slate-400">Csapat</label>
                 <select
-                  value={targetPlayerId ?? ""}
-                  onChange={(e) => setTargetPlayerId(e.target.value ? Number(e.target.value) : null)}
+                  value={selectedTeamId ?? ""}
+                  onChange={(e) => {
+                    setSelectedTeamId(e.target.value ? Number(e.target.value) : null);
+                    setTargetPlayerId(null);
+                  }}
                   className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
                 >
-                  <option value="">Válassz játékost...</option>
-                  {targetRoster.map((p) => (
+                  <option value="">Válassz csapatot...</option>
+                  {otherTeams.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                      {t.is_bot ? " (AI)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedTeamId !== null && (
+                <div>
+                  <label className="mb-1 block text-xs text-slate-400">Kért játékos</label>
+                  <select
+                    value={targetPlayerId ?? ""}
+                    onChange={(e) => setTargetPlayerId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
+                  >
+                    <option value="">Válassz játékost...</option>
+                    {targetRoster.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.first_name} {p.last_name} ({p.position}, OVR {p.overall})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">Felajánlott saját játékos (opcionális)</label>
+                <select
+                  value={offeredPlayerId ?? ""}
+                  onChange={(e) => setOfferedPlayerId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
+                >
+                  <option value="">Nincs</option>
+                  {team.players.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.first_name} {p.last_name} ({p.position}, OVR {p.overall})
                     </option>
                   ))}
                 </select>
               </div>
-            )}
 
-            <div>
-              <label className="mb-1 block text-xs text-slate-400">Felajánlott saját játékos (opcionális)</label>
-              <select
-                value={offeredPlayerId ?? ""}
-                onChange={(e) => setOfferedPlayerId(e.target.value ? Number(e.target.value) : null)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
+              <div>
+                <label className="mb-1 block text-xs text-slate-400">Készpénz felajánlás (FT)</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={cashOffer}
+                  onChange={(e) => setCashOffer(e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
+                />
+              </div>
+
+              <PrimaryButton
+                disabled={!selectedTeamId || !targetPlayerId || busy === "create-offer"}
+                onClick={() =>
+                  withBusy("create-offer", async () => {
+                    if (!selectedTeamId || !targetPlayerId) return;
+                    await createTradeOffer(selectedTeamId, targetPlayerId, offeredPlayerId, Number(cashOffer) || 0);
+                    resetForm();
+                    await refresh();
+                  })
+                }
+                className="w-full"
               >
-                <option value="">Nincs</option>
-                {team.players.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.first_name} {p.last_name} ({p.position}, OVR {p.overall})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-xs text-slate-400">Készpénz felajánlás (FT)</label>
-              <input
-                type="number"
-                min={0}
-                value={cashOffer}
-                onChange={(e) => setCashOffer(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm outline-none focus:border-team-primary"
-              />
-            </div>
-
-            <PrimaryButton
-              disabled={!selectedTeamId || !targetPlayerId || busy === "create-offer"}
-              onClick={() =>
-                withBusy("create-offer", async () => {
-                  if (!selectedTeamId || !targetPlayerId) return;
-                  await createTradeOffer(selectedTeamId, targetPlayerId, offeredPlayerId, Number(cashOffer) || 0);
-                  resetForm();
-                  await refresh();
-                })
-              }
-              className="w-full"
-            >
-              Ajánlat küldése
-            </PrimaryButton>
-          </Card>
+                Ajánlat küldése
+              </PrimaryButton>
+            </Card>
+          </div>
         )}
       </div>
 
@@ -431,6 +486,12 @@ export default function TradesTab({ team, onTeamUpdate }: Props) {
               withBusy(`offer-${o.id}`, async () => {
                 await cancelTradeOffer(o.id);
                 await refresh();
+              })
+            }
+            onEditResend={() =>
+              openOfferForm(o.to_team_id, o.target_player.id, {
+                offeredPlayerId: o.offered_player?.id ?? null,
+                cashOffer: o.cash_offer,
               })
             }
           />
