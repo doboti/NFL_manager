@@ -137,34 +137,302 @@ def _decompose_score(score: int) -> list[int]:
     return plays
 
 
-def _play_description(team_name: str, quarter: int, points: int, lineup: dict[Position, list[Player]], tactic: Tactic) -> str:
+def _prefer_pass(tactic: Tactic) -> bool:
+    """Same tendency every drive/play uses to pick pass vs. run, so the
+    approach plays and the final scoring play stay tactic-consistent."""
+    if tactic == Tactic.RUN_HEAVY:
+        return False
+    return tactic == Tactic.PASS_HEAVY or random.random() < 0.55
+
+
+def _player_ref(player: Player | None) -> dict | None:
+    if player is None:
+        return None
+    return {"first_name": player.first_name, "last_name": player.last_name, "photo_url": player.photo_url}
+
+
+def _approach_play(
+    quarter: int,
+    offense_side: str,
+    team_name: str,
+    lineup: dict[Position, list[Player]],
+    tactic: Tactic,
+    current_yard: int,
+    direction: int,
+) -> tuple[dict, int]:
+    """One non-scoring play inside a drive -- pass or run, for pacing and
+    visual variety (including the occasional incomplete pass) before the
+    drive's outcome (a score, or a punt for filler drives)."""
+    qb = lineup[Position.QB][0] if lineup[Position.QB] else None
+    rb = lineup[Position.RB][0] if lineup[Position.RB] else None
+    wr = lineup[Position.WR][0] if lineup[Position.WR] else None
+
+    if _prefer_pass(tactic) and qb and wr:
+        success = random.random() < 0.68
+        yards = random.randint(3, 22) if success else 0
+        new_yard = current_yard + direction * yards
+        if success:
+            text = f"[{team_name}] {quarter}. negyed: {qb.first_name} {qb.last_name} passza {wr.first_name} {wr.last_name}-hez, {yards} yard"
+        else:
+            text = f"[{team_name}] {quarter}. negyed: {qb.first_name} {qb.last_name} passza {wr.first_name} {wr.last_name} felé -- labdaszerzés nélkül"
+        return (
+            {
+                "quarter": quarter,
+                "offense": offense_side,
+                "play_type": "pass",
+                "success": success,
+                "start_yard": current_yard,
+                "end_yard": new_yard,
+                "yards": yards if success else 0,
+                "result": "gain" if success else "incomplete",
+                "points": 0,
+                "primary_player": _player_ref(qb),
+                "secondary_player": _player_ref(wr),
+                "text": text,
+            },
+            new_yard,
+        )
+
+    if rb:
+        yards = random.randint(1, 12)
+        new_yard = current_yard + direction * yards
+        text = f"[{team_name}] {quarter}. negyed: {rb.first_name} {rb.last_name} fut {yards} yardot"
+        return (
+            {
+                "quarter": quarter,
+                "offense": offense_side,
+                "play_type": "run",
+                "success": True,
+                "start_yard": current_yard,
+                "end_yard": new_yard,
+                "yards": yards,
+                "result": "gain",
+                "points": 0,
+                "primary_player": _player_ref(rb),
+                "secondary_player": None,
+                "text": text,
+            },
+            new_yard,
+        )
+
+    # Degenerate roster (no usable QB/WR/RB) -- shouldn't happen with a real
+    # imported roster, but never crash a match over it.
+    return (
+        {
+            "quarter": quarter,
+            "offense": offense_side,
+            "play_type": "run",
+            "success": True,
+            "start_yard": current_yard,
+            "end_yard": current_yard,
+            "yards": 0,
+            "result": "gain",
+            "points": 0,
+            "primary_player": None,
+            "secondary_player": None,
+            "text": f"[{team_name}] {quarter}. negyed: rövid játék",
+        },
+        current_yard,
+    )
+
+
+def _final_scoring_play(
+    quarter: int,
+    offense_side: str,
+    team_name: str,
+    lineup: dict[Position, list[Player]],
+    tactic: Tactic,
+    current_yard: int,
+    points: int,
+) -> dict:
+    """The scoring play itself -- same wording/decision logic the old
+    _play_description used (kept byte-for-byte compatible so `play_log`
+    reads exactly as it did before), now also emitting the structured
+    fields the animated replay needs."""
     qb = lineup[Position.QB][0] if lineup[Position.QB] else None
     rb = lineup[Position.RB][0] if lineup[Position.RB] else None
     wr = lineup[Position.WR][0] if lineup[Position.WR] else None
     k = lineup[Position.K][0] if lineup[Position.K] else None
 
+    goal_yard = 100 if offense_side == "home" else 0
+    primary: Player | None = None
+    secondary: Player | None = None
+
     if points in (6, 7, 8):
-        prefer_pass = tactic == Tactic.PASS_HEAVY or (tactic != Tactic.RUN_HEAVY and random.random() < 0.55)
+        prefer_pass = _prefer_pass(tactic)
         if prefer_pass and qb and wr:
-            yards = random.randint(5, 55)
+            yards = abs(goal_yard - current_yard)
             play = f"{qb.first_name} {qb.last_name} egy {yards} yardos passzt ad {wr.first_name} {wr.last_name}-nek -> Touchdown"
+            primary, secondary, play_type = qb, wr, "pass"
         elif rb:
-            yards = random.randint(1, 30)
+            yards = abs(goal_yard - current_yard)
             play = f"{rb.first_name} {rb.last_name} {yards} yardos futással pontszerez -> Touchdown"
+            primary, play_type = rb, "run"
         else:
             play = "Touchdown"
+            play_type = "run"
         if points == 6:
             play += " (a mezőnygól kísérlet kimarad)"
         elif points == 8:
             play += " (sikeres 2 pontos extra próbával)"
+        result = "touchdown"
+        end_yard = goal_yard
     elif points == 3 and k:
         play = f"{k.first_name} {k.last_name} mezőnygólt értékesít"
+        primary, play_type = k, "field_goal"
+        result = "field_goal"
+        end_yard = current_yard
     elif points == 2:
         play = "Biztonsági pont (safety)"
+        play_type = "safety"
+        result = "safety"
+        end_yard = current_yard
     else:
         play = f"{points} pontos pontszerzés"
+        play_type = "run"
+        result = "gain"
+        end_yard = current_yard
 
-    return f"[{team_name}] {quarter}. negyed: {play} (+{points})"
+    text = f"[{team_name}] {quarter}. negyed: {play} (+{points})"
+
+    return {
+        "quarter": quarter,
+        "offense": offense_side,
+        "play_type": play_type,
+        "success": True,
+        "start_yard": current_yard,
+        "end_yard": end_yard,
+        "yards": abs(end_yard - current_yard),
+        "result": result,
+        "points": points,
+        "primary_player": _player_ref(primary),
+        "secondary_player": _player_ref(secondary),
+        "text": text,
+    }
+
+
+def _generate_drive(
+    quarter: int,
+    offense_side: str,
+    team_name: str,
+    lineup: dict[Position, list[Player]],
+    tactic: Tactic,
+    points: int | None,
+) -> list[dict]:
+    """Builds one possession as a list of structured play events: a few
+    approach plays advancing the ball, ending either in the scoring play
+    matching `points` (already decided by _decompose_score -- this never
+    changes the score, only decorates how it happened) or, for a filler
+    drive (points=None), a punt. Field position uses a 0-100 scale where 0
+    is the home team's own goal line and 100 is the away team's."""
+    if points == 2:
+        # A safety is scored by the *defense* in the offense's own end
+        # zone -- it doesn't fit the normal advancing-drive shape, so it's
+        # just the one event. Down/distance are decorative here (there's no
+        # real preceding drive to track), so a plain 1st & 10 stands in.
+        own_goal = 0 if offense_side == "home" else 100
+        event = _final_scoring_play(quarter, offense_side, team_name, lineup, tactic, own_goal, points)
+        event["down"], event["distance"] = 1, 10
+        return [event]
+
+    direction = 1 if offense_side == "home" else -1
+    own_goal = 0 if offense_side == "home" else 100
+    goal_yard = 100 - own_goal
+    current = own_goal + direction * random.randint(20, 40)
+
+    # Leave enough room before the goal line for the final play to still
+    # make sense (a field goal needs to stop short of the end zone).
+    safety_margin = 8 if points == 3 else 3
+
+    # Down & distance are tracked purely for the animated replay's on-screen
+    # display -- they never gate whether a drive continues or how it ends
+    # (that's still decided entirely by the score/filler logic above), so a
+    # "4th & long" here is just flavor, not a real turnover-on-downs check.
+    down, distance = 1, 10
+
+    events: list[dict] = []
+    for _ in range(random.randint(1, 3)):
+        remaining = abs(goal_yard - current)
+        if remaining <= safety_margin + 5:
+            break
+        event, current = _approach_play(quarter, offense_side, team_name, lineup, tactic, current, direction)
+        limit = goal_yard - direction * safety_margin
+        overshot = (direction == 1 and current > limit) or (direction == -1 and current < limit)
+        if overshot:
+            current = limit
+            event["end_yard"] = current
+            event["yards"] = abs(event["end_yard"] - event["start_yard"])
+
+        event["down"], event["distance"] = down, distance
+        if event["yards"] >= distance:
+            down, distance = 1, 10
+        else:
+            down, distance = min(down + 1, 4), max(distance - event["yards"], 1)
+        events.append(event)
+
+    if points is None:
+        k = lineup[Position.K][0] if lineup[Position.K] else None
+        punter_text = f"{k.first_name} {k.last_name} rúgása" if k else "Rúgás"
+        events.append(
+            {
+                "quarter": quarter,
+                "offense": offense_side,
+                "play_type": "punt",
+                "success": True,
+                "start_yard": current,
+                "end_yard": current,
+                "yards": 0,
+                "result": "punt",
+                "points": 0,
+                "primary_player": _player_ref(k),
+                "secondary_player": None,
+                "text": f"[{team_name}] {quarter}. negyed: {punter_text} -- labdaátadás",
+                "down": down,
+                "distance": distance,
+            }
+        )
+    else:
+        final_event = _final_scoring_play(quarter, offense_side, team_name, lineup, tactic, current, points)
+        final_event["down"], final_event["distance"] = down, distance
+        events.append(final_event)
+
+    return events
+
+
+def _annotate_clock_and_timeouts(events: list[dict]) -> None:
+    """Decorative game-clock and timeout figures for the animated replay,
+    computed once the full play list is known. Mutates events in place.
+    Never read by anything that decides the score -- purely cosmetic."""
+    by_quarter: dict[int, list[dict]] = {}
+    for event in events:
+        by_quarter.setdefault(event["quarter"], []).append(event)
+
+    for quarter_events in by_quarter.values():
+        n = len(quarter_events)
+        remaining = 900
+        for i, event in enumerate(quarter_events):
+            target = round(900 * (1 - (i + 1) / (n + 1)))
+            remaining = max(5, min(remaining - 1, target + random.randint(-10, 10)))
+            event["clock"] = f"{remaining // 60}:{remaining % 60:02d}"
+
+    # 0-3 timeouts used per team per half, weighted toward using few --
+    # spent gradually across the half rather than all at once.
+    timeouts_used = {
+        (side, half): random.choices([0, 1, 2, 3], weights=[40, 35, 18, 7])[0]
+        for side in ("home", "away")
+        for half in (1, 2)
+    }
+
+    for event in events:
+        quarter = event["quarter"]
+        half = 1 if quarter <= 2 else 2
+        quarter_in_half = quarter if quarter <= 2 else quarter - 2
+        minutes, seconds = event["clock"].split(":")
+        seconds_left = int(minutes) * 60 + int(seconds)
+        elapsed = (quarter_in_half - 1) * 900 + (900 - seconds_left)
+        fraction = min(1.0, elapsed / 1800)
+        event["home_timeouts"] = 3 - round(timeouts_used[("home", half)] * fraction)
+        event["away_timeouts"] = 3 - round(timeouts_used[("away", half)] * fraction)
 
 
 def simulate_match(
@@ -202,19 +470,30 @@ def simulate_match(
     if away_score == 1:
         away_score = 0
 
-    plays: list[tuple[int, int, str]] = []
+    # (quarter, points, side) -- points=None marks a non-scoring filler
+    # drive, added purely for pacing/watchability in the animated replay
+    # and never affecting the final score above.
+    drives: list[tuple[int, int | None, str]] = []
     for pts in _decompose_score(home_score):
-        plays.append((random.randint(1, 4), pts, "home"))
+        drives.append((random.randint(1, 4), pts, "home"))
     for pts in _decompose_score(away_score):
-        plays.append((random.randint(1, 4), pts, "away"))
-    plays.sort(key=lambda p: p[0])
+        drives.append((random.randint(1, 4), pts, "away"))
+    for _ in range(random.randint(2, 4)):
+        drives.append((random.randint(1, 4), None, random.choice(["home", "away"])))
+    drives.sort(key=lambda d: d[0])
 
-    log = []
-    for quarter, pts, side in plays:
-        if side == "home":
-            log.append(_play_description(home_name, quarter, pts, home.lineup, home_tactic))
-        else:
-            log.append(_play_description(away_name, quarter, pts, away.lineup, away_tactic))
+    events: list[dict] = []
+    log: list[str] = []
+    for quarter, pts, side in drives:
+        team_name = home_name if side == "home" else away_name
+        lineup = home.lineup if side == "home" else away.lineup
+        tactic = home_tactic if side == "home" else away_tactic
+        drive_events = _generate_drive(quarter, side, team_name, lineup, tactic, pts)
+        events.extend(drive_events)
+        if pts is not None:
+            log.append(drive_events[-1]["text"])
+
+    _annotate_clock_and_timeouts(events)
 
     return {
         "home_score": home_score,
@@ -222,4 +501,5 @@ def simulate_match(
         "home_power": round(home.offense),
         "away_power": round(away.offense),
         "play_log": log,
+        "play_events": events,
     }

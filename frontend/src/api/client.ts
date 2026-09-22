@@ -157,17 +157,52 @@ export interface Sponsor {
   expires_at: string;
 }
 
+export interface PlayerRef {
+  first_name: string;
+  last_name: string;
+  photo_url: string | null;
+}
+
+export type PlayType = "pass" | "run" | "field_goal" | "punt" | "safety";
+
+export interface PlayEvent {
+  quarter: number;
+  offense: "home" | "away";
+  play_type: PlayType;
+  success: boolean;
+  start_yard: number;
+  end_yard: number;
+  yards: number;
+  result: string;
+  points: number;
+  primary_player: PlayerRef | null;
+  secondary_player: PlayerRef | null;
+  text: string;
+  // Decorative game-context fields (down/distance, clock, timeouts) --
+  // absent (undefined) on matches simulated before these existed.
+  down?: number | null;
+  distance?: number | null;
+  clock?: string | null;
+  home_timeouts?: number | null;
+  away_timeouts?: number | null;
+}
+
 export interface Match {
   id: number;
   home_team_id: number;
   away_team_id: number;
   home_team_name: string;
   away_team_name: string;
+  home_team_logo_url: string | null;
+  away_team_logo_url: string | null;
+  home_team_primary_color: string;
+  away_team_primary_color: string;
   home_score: number | null;
   away_score: number | null;
   home_tactic: Tactic;
   away_tactic: Tactic;
   play_log: string[] | null;
+  play_events: PlayEvent[] | null;
   played: boolean;
   played_at: string | null;
   is_playoff: boolean;
@@ -176,9 +211,12 @@ export interface Match {
 
 export interface PracticeMatchResult {
   opponent_name: string;
+  home_team_logo_url?: string | null;
+  home_team_primary_color?: string | null;
   home_score: number;
   away_score: number;
   play_log: string[];
+  play_events: PlayEvent[];
 }
 
 export interface TradeOffer {

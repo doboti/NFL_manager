@@ -69,6 +69,10 @@ export default function MatchesTab({ team }: Props) {
                 homeScore={practiceResult.home_score}
                 awayScore={practiceResult.away_score}
                 playLog={practiceResult.play_log}
+                playEvents={practiceResult.play_events}
+                homeLogoUrl={practiceResult.home_team_logo_url}
+                homePrimaryColor={practiceResult.home_team_primary_color}
+                isLive
               />
             </motion.div>
           )}
@@ -122,6 +126,11 @@ export default function MatchesTab({ team }: Props) {
                         homeScore={m.home_score ?? 0}
                         awayScore={m.away_score ?? 0}
                         playLog={m.play_log}
+                        playEvents={m.play_events}
+                        homeLogoUrl={m.home_team_logo_url}
+                        awayLogoUrl={m.away_team_logo_url}
+                        homePrimaryColor={m.home_team_primary_color}
+                        awayPrimaryColor={m.away_team_primary_color}
                       />
                     </motion.div>
                   )}

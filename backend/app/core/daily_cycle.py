@@ -54,6 +54,7 @@ def run_daily_cycle(db: Session) -> dict:
         match.home_score = result["home_score"]
         match.away_score = result["away_score"]
         match.play_log = result["play_log"]
+        match.play_events = result["play_events"]
         match.played = True
         match.played_at = now
 
