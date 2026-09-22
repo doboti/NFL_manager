@@ -178,6 +178,13 @@ export interface PlayEvent {
   primary_player: PlayerRef | null;
   secondary_player: PlayerRef | null;
   text: string;
+  // Decorative game-context fields (down/distance, clock, timeouts) --
+  // absent (undefined) on matches simulated before these existed.
+  down?: number | null;
+  distance?: number | null;
+  clock?: string | null;
+  home_timeouts?: number | null;
+  away_timeouts?: number | null;
 }
 
 export interface Match {
@@ -186,6 +193,10 @@ export interface Match {
   away_team_id: number;
   home_team_name: string;
   away_team_name: string;
+  home_team_logo_url: string | null;
+  away_team_logo_url: string | null;
+  home_team_primary_color: string;
+  away_team_primary_color: string;
   home_score: number | null;
   away_score: number | null;
   home_tactic: Tactic;
@@ -200,6 +211,8 @@ export interface Match {
 
 export interface PracticeMatchResult {
   opponent_name: string;
+  home_team_logo_url?: string | null;
+  home_team_primary_color?: string | null;
   home_score: number;
   away_score: number;
   play_log: string[];

@@ -25,6 +25,16 @@ class PlayEventOut(BaseModel):
     primary_player: PlayerRef | None
     secondary_player: PlayerRef | None
     text: str
+    # Decorative game-context fields for the animated replay (down/distance,
+    # game clock, timeouts) -- generated alongside the drive purely for
+    # visual flavor, never fed back into how the score is decided. Optional
+    # since matches simulated before this was added have play_events blobs
+    # in the database that predate these keys.
+    down: int | None = None
+    distance: int | None = None
+    clock: str | None = None
+    home_timeouts: int | None = None
+    away_timeouts: int | None = None
 
 
 class MatchOut(BaseModel):
@@ -35,6 +45,10 @@ class MatchOut(BaseModel):
     away_team_id: int
     home_team_name: str
     away_team_name: str
+    home_team_logo_url: str | None
+    away_team_logo_url: str | None
+    home_team_primary_color: str
+    away_team_primary_color: str
     home_score: int | None
     away_score: int | None
     home_tactic: Tactic
@@ -49,6 +63,8 @@ class MatchOut(BaseModel):
 
 class PracticeMatchResult(BaseModel):
     opponent_name: str
+    home_team_logo_url: str | None = None
+    home_team_primary_color: str | None = None
     home_score: int
     away_score: int
     play_log: list[str]

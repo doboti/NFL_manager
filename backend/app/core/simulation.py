@@ -328,9 +328,12 @@ def _generate_drive(
     if points == 2:
         # A safety is scored by the *defense* in the offense's own end
         # zone -- it doesn't fit the normal advancing-drive shape, so it's
-        # just the one event.
+        # just the one event. Down/distance are decorative here (there's no
+        # real preceding drive to track), so a plain 1st & 10 stands in.
         own_goal = 0 if offense_side == "home" else 100
-        return [_final_scoring_play(quarter, offense_side, team_name, lineup, tactic, own_goal, points)]
+        event = _final_scoring_play(quarter, offense_side, team_name, lineup, tactic, own_goal, points)
+        event["down"], event["distance"] = 1, 10
+        return [event]
 
     direction = 1 if offense_side == "home" else -1
     own_goal = 0 if offense_side == "home" else 100
@@ -340,6 +343,12 @@ def _generate_drive(
     # Leave enough room before the goal line for the final play to still
     # make sense (a field goal needs to stop short of the end zone).
     safety_margin = 8 if points == 3 else 3
+
+    # Down & distance are tracked purely for the animated replay's on-screen
+    # display -- they never gate whether a drive continues or how it ends
+    # (that's still decided entirely by the score/filler logic above), so a
+    # "4th & long" here is just flavor, not a real turnover-on-downs check.
+    down, distance = 1, 10
 
     events: list[dict] = []
     for _ in range(random.randint(1, 3)):
@@ -353,6 +362,12 @@ def _generate_drive(
             current = limit
             event["end_yard"] = current
             event["yards"] = abs(event["end_yard"] - event["start_yard"])
+
+        event["down"], event["distance"] = down, distance
+        if event["yards"] >= distance:
+            down, distance = 1, 10
+        else:
+            down, distance = min(down + 1, 4), max(distance - event["yards"], 1)
         events.append(event)
 
     if points is None:
@@ -372,12 +387,52 @@ def _generate_drive(
                 "primary_player": _player_ref(k),
                 "secondary_player": None,
                 "text": f"[{team_name}] {quarter}. negyed: {punter_text} -- labdaátadás",
+                "down": down,
+                "distance": distance,
             }
         )
     else:
-        events.append(_final_scoring_play(quarter, offense_side, team_name, lineup, tactic, current, points))
+        final_event = _final_scoring_play(quarter, offense_side, team_name, lineup, tactic, current, points)
+        final_event["down"], final_event["distance"] = down, distance
+        events.append(final_event)
 
     return events
+
+
+def _annotate_clock_and_timeouts(events: list[dict]) -> None:
+    """Decorative game-clock and timeout figures for the animated replay,
+    computed once the full play list is known. Mutates events in place.
+    Never read by anything that decides the score -- purely cosmetic."""
+    by_quarter: dict[int, list[dict]] = {}
+    for event in events:
+        by_quarter.setdefault(event["quarter"], []).append(event)
+
+    for quarter_events in by_quarter.values():
+        n = len(quarter_events)
+        remaining = 900
+        for i, event in enumerate(quarter_events):
+            target = round(900 * (1 - (i + 1) / (n + 1)))
+            remaining = max(5, min(remaining - 1, target + random.randint(-10, 10)))
+            event["clock"] = f"{remaining // 60}:{remaining % 60:02d}"
+
+    # 0-3 timeouts used per team per half, weighted toward using few --
+    # spent gradually across the half rather than all at once.
+    timeouts_used = {
+        (side, half): random.choices([0, 1, 2, 3], weights=[40, 35, 18, 7])[0]
+        for side in ("home", "away")
+        for half in (1, 2)
+    }
+
+    for event in events:
+        quarter = event["quarter"]
+        half = 1 if quarter <= 2 else 2
+        quarter_in_half = quarter if quarter <= 2 else quarter - 2
+        minutes, seconds = event["clock"].split(":")
+        seconds_left = int(minutes) * 60 + int(seconds)
+        elapsed = (quarter_in_half - 1) * 900 + (900 - seconds_left)
+        fraction = min(1.0, elapsed / 1800)
+        event["home_timeouts"] = 3 - round(timeouts_used[("home", half)] * fraction)
+        event["away_timeouts"] = 3 - round(timeouts_used[("away", half)] * fraction)
 
 
 def simulate_match(
@@ -437,6 +492,8 @@ def simulate_match(
         events.extend(drive_events)
         if pts is not None:
             log.append(drive_events[-1]["text"])
+
+    _annotate_clock_and_timeouts(events)
 
     return {
         "home_score": home_score,

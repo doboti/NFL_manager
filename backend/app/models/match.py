@@ -58,6 +58,14 @@ class Match(Base):
         return self.away_team.logo_url
 
     @property
+    def home_team_primary_color(self) -> str:
+        return self.home_team.primary_color
+
+    @property
+    def away_team_primary_color(self) -> str:
+        return self.away_team.primary_color
+
+    @property
     def home_win_probability(self) -> float:
         """Derived from the exact same expected-score model simulate_match()
         uses to decide the real outcome (#27 -- the old version estimated
