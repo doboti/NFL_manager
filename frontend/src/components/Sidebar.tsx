@@ -79,20 +79,26 @@ function SidebarHeader({ team }: { team: Team }) {
   );
 }
 
-function SidebarFooter() {
+function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
   return (
     <div className="mt-4 flex flex-col gap-1 border-t border-slate-800 pt-4">
       <button
-        onClick={() => navigate("/profile")}
+        onClick={() => {
+          onNavigate?.();
+          navigate("/profile");
+        }}
         className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-400 transition-colors hover:text-slate-100"
       >
         <User size={18} />
         Profil
       </button>
       <button
-        onClick={logout}
+        onClick={() => {
+          onNavigate?.();
+          logout();
+        }}
         className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-400 transition-colors hover:text-red-400"
       >
         <LogOut size={18} />
@@ -155,7 +161,7 @@ export default function Sidebar({ team, activeTab, onTabChange }: Props) {
                   setMobileOpen(false);
                 }}
               />
-              <SidebarFooter />
+              <SidebarFooter onNavigate={() => setMobileOpen(false)} />
             </motion.aside>
           </>
         )}

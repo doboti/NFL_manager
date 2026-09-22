@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Boolean, DateTime, Enum, ForeignKey, Integer, String
@@ -56,17 +57,38 @@ class Match(Base):
     def away_team_logo_url(self) -> str | None:
         return self.away_team.logo_url
 
-    @staticmethod
-    def _avg_overall(team: "Team") -> float:
-        if not team.players:
-            return 60.0
-        return sum(p.overall for p in team.players) / len(team.players)
-
     @property
     def home_win_probability(self) -> float:
-        """Elo-style estimate from each roster's average OVR (#17 --
-        the "becsült esélyek" next-match odds display never had a data
-        source to draw from). /20 divisor keeps a realistic ~10-point
-        roster gap around 76% instead of a near-certainty."""
-        diff = self._avg_overall(self.home_team) - self._avg_overall(self.away_team)
-        return round(1 / (1 + 10 ** (-diff / 20)), 3)
+        """Derived from the exact same expected-score model simulate_match()
+        uses to decide the real outcome (#27 -- the old version estimated
+        this from a plain average-OVR-of-the-whole-roster Elo formula, which
+        could diverge sharply from the actual simulated matchup: it ignored
+        starting lineups/tactics entirely and gave the single DEF rating
+        only 1-of-N roster weight instead of the full weight it carries
+        against the opponent's offense in the simulator, so the displayed
+        odds regularly didn't match what the sim would actually produce).
+
+        home_score and away_score are each ~Normal(expected, std) in
+        simulate_match, so their difference is also Normal with mean
+        home_expected-away_expected and variance std_home^2+std_away^2;
+        the win probability is the mass of that distribution above zero."""
+        from app.core.simulation import (
+            BASE_TEAM_POINTS,
+            MIN_SCORE_STD,
+            POINT_SCALE,
+            SCORE_STD_RATIO,
+            compute_team_strength,
+        )
+
+        home = compute_team_strength(self.home_team.players, self.home_tactic, self.away_tactic)
+        away = compute_team_strength(self.away_team.players, self.away_tactic, self.home_tactic)
+
+        home_expected = max(3.0, BASE_TEAM_POINTS + (home.offense - away.defense) * POINT_SCALE)
+        away_expected = max(3.0, BASE_TEAM_POINTS + (away.offense - home.defense) * POINT_SCALE)
+        home_std = max(MIN_SCORE_STD, home_expected * SCORE_STD_RATIO) * home.variance
+        away_std = max(MIN_SCORE_STD, away_expected * SCORE_STD_RATIO) * away.variance
+
+        margin_std = math.sqrt(home_std**2 + away_std**2)
+        z = (home_expected - away_expected) / margin_std
+        probability = 0.5 * (1 + math.erf(z / math.sqrt(2)))
+        return round(probability, 3)
